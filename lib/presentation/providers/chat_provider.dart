@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/constants/usage_provider.dart';
 import '../../core/constants/app_config.dart';
 import '../../data/models/chat.dart';
 import '../../data/models/message.dart';
@@ -197,7 +198,13 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     }
     _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, content);
 
-    _addAIReply(message);
+    // Check usage limit before AI reply
+    final canUse = await _ref.read(usageProvider.notifier).tryUse();
+    if (canUse) {
+      _addAIReply(message);
+    } else {
+      _addLimitExceededMessage();
+    }
   }
 
   Future<void> sendImageMessage(String imagePath, {String? replyToId, String? replyToContent}) async {
@@ -233,7 +240,13 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     }
     _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, '[图片]');
 
-    _addAIImageReply(message);
+    // Check usage limit before AI reply
+    final canUse = await _ref.read(usageProvider.notifier).tryUse();
+    if (canUse) {
+      _addAIImageReply(message);
+    } else {
+      _addLimitExceededMessage();
+    }
   }
 
   Future<void> sendVoiceMessage(String audioPath, {String? replyToId, String? replyToContent}) async {
@@ -259,7 +272,28 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     }
     _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, '[语音]');
 
-    _addAIReply(message);
+    // Check usage limit before AI reply
+    final canUse = await _ref.read(usageProvider.notifier).tryUse();
+    if (canUse) {
+      _addAIReply(message);
+    } else {
+      _addLimitExceededMessage();
+    }
+  }
+
+  void _addLimitExceededMessage() {
+    _ref.read(isLoadingProvider.notifier).state = false;
+    final limitMessage = Message(
+      id: _uuid.v4(),
+      chatId: _chatId,
+      type: MessageType.text,
+      content: '今日免费次数已用完（100次/天），请明天再来或升级会员。',
+      timestamp: DateTime.now(),
+      isFromMe: false,
+    );
+    _repository.saveMessage(limitMessage);
+    state = [...state, limitMessage];
+    _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, '今日免费次数已用完');
   }
 
   Future<void> _addAIReply(Message originalMessage) async {

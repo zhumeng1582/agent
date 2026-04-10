@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
 import '../../core/constants/font_size_provider.dart';
+import '../../core/constants/usage_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,7 @@ class SettingsScreen extends ConsumerWidget {
     final isDarkMode = themeMode == ThemeMode.dark;
     final currentLocale = ref.watch(localeProvider);
     final fontSize = ref.watch(fontSizeProvider);
+    final usage = ref.watch(usageProvider);
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.grey[900] : AppColors.background,
@@ -32,6 +34,13 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: [
+          _buildSection(
+            title: _getLocalizedText('usage', currentLocale),
+            isDarkMode: isDarkMode,
+            children: [
+              _buildUsageTile(usage, isDarkMode, currentLocale),
+            ],
+          ),
           _buildSection(
             title: _getLocalizedText('appearance', currentLocale),
             isDarkMode: isDarkMode,
@@ -67,6 +76,41 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUsageTile(UsageState usage, bool isDarkMode, Locale locale) {
+    final remaining = usage.remaining;
+    final isLimited = usage.isLimited;
+
+    return ListTile(
+      title: Text(
+        _getLocalizedText('dailyUsage', locale),
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
+      subtitle: Text(
+        '${remaining}/100 ${_getLocalizedText('remaining', locale)}',
+        style: TextStyle(
+          color: isLimited
+              ? Colors.red
+              : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+        ),
+      ),
+      trailing: isLimited
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getLocalizedText('limitReached', locale),
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            )
+          : null,
     );
   }
 
@@ -255,6 +299,10 @@ class SettingsScreen extends ConsumerWidget {
       'language': {'en': 'Language', 'zh': '语言', 'zh_TW': '語言'},
       'selectLanguage': {'en': 'Select Language', 'zh': '选择语言', 'zh_TW': '選擇語言'},
       'fontSize': {'en': 'Font Size', 'zh': '字体大小', 'zh_TW': '字體大小'},
+      'usage': {'en': 'Usage', 'zh': '使用情况', 'zh_TW': '使用情況'},
+      'dailyUsage': {'en': 'Daily AI Chats', 'zh': '今日AI对话', 'zh_TW': '今日AI對話'},
+      'remaining': {'en': 'remaining', 'zh': '次可用', 'zh_TW': '次可用'},
+      'limitReached': {'en': 'Limit', 'zh': '已用完', 'zh_TW': '已用完'},
     };
 
     final localeKey = locale.countryCode != null ? '${locale.languageCode}_${locale.countryCode}' : locale.languageCode;

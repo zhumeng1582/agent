@@ -45,4 +45,6 @@ app.*.map.json
 /android/app/release
 
 # API Keys and secrets
+# Copy app_config.example.dart to app_config.dart and fill in your API key
 lib/core/constants/app_config.dart
+*.local

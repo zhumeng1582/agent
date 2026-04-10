@@ -64,7 +64,6 @@ class ChatListScreen extends ConsumerWidget {
                   chat: chat,
                   isDarkMode: isDarkMode,
                   locale: locale,
-                  index: index,
                 );
               },
             ),
@@ -102,9 +101,8 @@ class _ChatListItem extends ConsumerWidget {
   final dynamic chat;
   final bool isDarkMode;
   final Locale locale;
-  final int index;
 
-  const _ChatListItem({super.key, required this.chat, required this.isDarkMode, required this.locale, required this.index});
+  const _ChatListItem({super.key, required this.chat, required this.isDarkMode, required this.locale});
 
   static const List<Color> _avatarColors = [
     AppColors.primary,
@@ -127,6 +125,11 @@ class _ChatListItem extends ConsumerWidget {
     Icons.psychology_alt,
     Icons.smart_toy_outlined,
   ];
+
+  int get _avatarIndex {
+    // Use hashCode of chat.id for consistent avatar per chat
+    return chat.id.hashCode.abs() % _avatarColors.length;
+  }
 
   String _t(String key) {
     final Map<String, Map<String, String>> translations = {
@@ -207,8 +210,8 @@ class _ChatListItem extends ConsumerWidget {
         color: isDarkMode ? Colors.grey[850] : Colors.white,
         child: ListTile(
           leading: CircleAvatar(
-            backgroundColor: _avatarColors[index % _avatarColors.length],
-            child: Icon(_avatarIcons[index % _avatarIcons.length], color: Colors.white),
+            backgroundColor: _avatarColors[_avatarIndex],
+            child: Icon(_avatarIcons[_avatarIndex], color: Colors.white),
           ),
           title: Row(
             children: [

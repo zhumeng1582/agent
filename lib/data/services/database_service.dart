@@ -16,17 +16,14 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 3) {
+        if (oldVersion < 4) {
           try {
-            await db.execute('ALTER TABLE chats ADD COLUMN isPinned INTEGER DEFAULT 0');
+            await db.execute('ALTER TABLE messages ADD COLUMN isFavorite INTEGER DEFAULT 0');
           } catch (_) {}
           try {
-            await db.execute('ALTER TABLE messages ADD COLUMN replyToId TEXT');
-          } catch (_) {}
-          try {
-            await db.execute('ALTER TABLE messages ADD COLUMN replyToContent TEXT');
+            await db.execute('ALTER TABLE messages ADD COLUMN translatedContent TEXT');
           } catch (_) {}
         }
       },
@@ -52,7 +49,9 @@ class DatabaseService {
             timestamp INTEGER NOT NULL,
             isFromMe INTEGER NOT NULL,
             replyToId TEXT,
-            replyToContent TEXT
+            replyToContent TEXT,
+            isFavorite INTEGER DEFAULT 0,
+            translatedContent TEXT
           )
         ''');
 
@@ -116,5 +115,35 @@ class DatabaseService {
   static Future<void> deleteAllMessages() async {
     final db = await database;
     await db.delete('messages');
+  }
+
+  static Future<List<Map<String, dynamic>>> getFavoriteMessages() async {
+    final db = await database;
+    return await db.query(
+      'messages',
+      where: 'isFavorite = ?',
+      whereArgs: [1],
+      orderBy: 'timestamp DESC',
+    );
+  }
+
+  static Future<void> updateMessageFavorite(String id, bool isFavorite) async {
+    final db = await database;
+    await db.update(
+      'messages',
+      {'isFavorite': isFavorite ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  static Future<void> updateMessageTranslation(String id, String translatedContent) async {
+    final db = await database;
+    await db.update(
+      'messages',
+      {'translatedContent': translatedContent},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

@@ -10,6 +10,8 @@ class Message {
   final bool isFromMe;
   final String? replyToId;
   final String? replyToContent;
+  final bool isFavorite;
+  final String? translatedContent;
 
   Message({
     required this.id,
@@ -21,6 +23,8 @@ class Message {
     required this.isFromMe,
     this.replyToId,
     this.replyToContent,
+    this.isFavorite = false,
+    this.translatedContent,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +38,8 @@ class Message {
       'isFromMe': isFromMe ? 1 : 0,
       'replyToId': replyToId,
       'replyToContent': replyToContent,
+      'isFavorite': isFavorite ? 1 : 0,
+      'translatedContent': translatedContent,
     };
   }
 
@@ -48,6 +54,8 @@ class Message {
       isFromMe: map['isFromMe'] == 1,
       replyToId: map['replyToId'],
       replyToContent: map['replyToContent'],
+      isFavorite: map['isFavorite'] == 1,
+      translatedContent: map['translatedContent'],
     );
   }
 
@@ -61,6 +69,8 @@ class Message {
     bool? isFromMe,
     String? replyToId,
     String? replyToContent,
+    bool? isFavorite,
+    String? translatedContent,
   }) {
     return Message(
       id: id ?? this.id,
@@ -72,6 +82,8 @@ class Message {
       isFromMe: isFromMe ?? this.isFromMe,
       replyToId: replyToId ?? this.replyToId,
       replyToContent: replyToContent ?? this.replyToContent,
+      isFavorite: isFavorite ?? this.isFavorite,
+      translatedContent: translatedContent ?? this.translatedContent,
     );
   }
 

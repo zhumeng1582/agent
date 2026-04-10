@@ -200,14 +200,14 @@ class _InputBarState extends ConsumerState<InputBar> {
     final isDarkMode = themeMode == ThemeMode.dark;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[850] : AppColors.surface,
+        color: isDarkMode ? Colors.grey[850] : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
@@ -218,8 +218,8 @@ class _InputBarState extends ConsumerState<InputBar> {
             if (_isRecording) _buildRecordingIndicator(isDarkMode),
             Row(
               children: [
-                _buildMediaButton(icon: Icons.image, onTap: _pickImage, isDarkMode: isDarkMode),
-                _buildMediaButton(icon: Icons.camera_alt, onTap: _takePhoto, isDarkMode: isDarkMode),
+                _buildMediaButton(icon: Icons.image_rounded, onTap: _pickImage, isDarkMode: isDarkMode),
+                _buildMediaButton(icon: Icons.camera_alt_rounded, onTap: _takePhoto, isDarkMode: isDarkMode),
                 Expanded(child: _buildTextField(isDarkMode)),
                 const SizedBox(width: 8),
                 _isRecording ? _buildRecordingControls(isDarkMode) : _buildSendButton(),
@@ -264,17 +264,21 @@ class _InputBarState extends ConsumerState<InputBar> {
   Widget _buildTextField(bool isDarkMode) {
     return Container(
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+        color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDarkMode ? Colors.grey[600]! : Colors.grey[300]!,
+          width: 1,
+        ),
       ),
       child: TextField(
         controller: _textController,
         style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         decoration: InputDecoration(
           hintText: _t('typeMessage'),
-          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[500]),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         ),
         textInputAction: TextInputAction.send,
         onSubmitted: (_) => _sendText(),

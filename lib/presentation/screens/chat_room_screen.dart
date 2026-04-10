@@ -3,10 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
+import '../../core/constants/chat_background_provider.dart';
+import '../../core/constants/translation_provider.dart';
+import '../../core/constants/translation_state_provider.dart';
 import '../../data/models/message.dart';
+import '../../data/services/database_service.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/input_bar.dart';
+import 'chat_settings_screen.dart';
+import 'search_screen.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
   final String chatId;
@@ -27,6 +33,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
 class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   final _scrollController = ScrollController();
   bool _userHasScrolledUp = false;
+  late String _chatTitle;
   bool _initialized = false;
   late String _actualChatId;
   Message? _replyToMessage;
@@ -35,6 +42,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   void initState() {
     super.initState();
     _actualChatId = widget.chatId;
+    _chatTitle = widget.chatName;
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom(animated: false);
@@ -95,6 +103,43 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     });
   }
 
+  Future<void> _toggleFavorite(Message message) async {
+    final newFavorite = !message.isFavorite;
+    await DatabaseService.updateMessageFavorite(message.id, newFavorite);
+    // Update the message in state directly without full refresh
+    final updatedMessage = message.copyWith(isFavorite: newFavorite);
+    ref.read(messagesProvider(_actualChatId).notifier).updateMessage(updatedMessage);
+  }
+
+  Future<void> _translateMessage(Message message) async {
+    if (message.translatedContent != null && message.translatedContent!.isNotEmpty) {
+      // Already translated, just show it
+      return;
+    }
+    if (message.content == null || message.content!.isEmpty) {
+      return;
+    }
+
+    // Set loading state
+    final loadingNotifier = ref.read(translationLoadingProvider.notifier);
+    loadingNotifier.setLoading(message.id, true);
+
+    try {
+      final translationService = ref.read(translationServiceProvider);
+      final translated = await translationService.translate(message.content!);
+      await DatabaseService.updateMessageTranslation(message.id, translated);
+      // Update the message in state directly without full refresh
+      final updatedMessage = message.copyWith(translatedContent: translated);
+      ref.read(messagesProvider(_actualChatId).notifier).updateMessage(updatedMessage);
+    } finally {
+      loadingNotifier.setLoading(message.id, false);
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   void _cancelReply() {
     setState(() {
       _replyToMessage = null;
@@ -109,6 +154,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       'cancel': {'en': 'Cancel', 'zh': '取消', 'zh_TW': '取消'},
       'confirm': {'en': 'Confirm', 'zh': '确定', 'zh_TW': '確定'},
       'startChatting': {'en': 'Start chatting\nSend text, image or voice messages', 'zh': '开始聊天吧\n发送文本、图片或语音消息', 'zh_TW': '開始聊天吧\n發送文本、圖片或語音訊息'},
+      'selectBackground': {'en': 'Select Background', 'zh': '选择背景', 'zh_TW': '選擇背景'},
     };
 
     final localeKey = locale.countryCode != null ? '${locale.languageCode}_${locale.countryCode}' : locale.languageCode;
@@ -201,6 +247,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
     final locale = ref.watch(localeProvider);
+    final bgState = ref.watch(chatBackgroundProvider);
 
     ref.listen(messagesProvider(_actualChatId), (previous, next) {
       if (previous != null && next.length > previous.length) {
@@ -211,10 +258,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     });
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey[900] : AppColors.background,
+      backgroundColor: bgState.customColor,
       appBar: AppBar(
         title: Text(
-          widget.chatName,
+          _chatTitle,
           style: TextStyle(
             color: isDarkMode ? Colors.white : Colors.black,
           ),
@@ -227,41 +274,41 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              Icons.delete_outline,
+              Icons.search,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(
-                    _t('clearChat', locale),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  content: Text(
-                    _t('clearChatConfirm', locale),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                    ),
-                  ),
-                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: Text(_t('cancel', locale)),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: Text(_t('confirm', locale)),
-                    ),
-                  ],
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SearchScreen(chatId: _actualChatId),
                 ),
               );
-              if (confirm == true) {
-                await ref.read(messagesProvider(_actualChatId).notifier).clearAll();
-              }
+            },
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.more_vert,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatSettingsScreen(
+                    chatId: _actualChatId,
+                    currentTitle: _chatTitle,
+                    onTitleChanged: (newTitle) {
+                      setState(() {
+                        _chatTitle = newTitle;
+                      });
+                    },
+                    onClearChat: () async {
+                      await ref.read(messagesProvider(_actualChatId).notifier).clearAll();
+                    },
+                  ),
+                ),
+              );
             },
           ),
         ],
@@ -271,12 +318,24 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           Expanded(
             child: messages.isEmpty
                 ? Center(
-                    child: Text(
-                      _t('startChatting', locale),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline,
+                          size: 64,
+                          color: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _t('startChatting', locale),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -284,11 +343,19 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final showDate = index == 0 ||
+                          !_isSameDay(messages[index - 1].timestamp, message.timestamp);
+
                       return MessageBubble(
-                        message: messages[index],
+                        key: ValueKey(message.id),
+                        message: message,
                         isDarkMode: isDarkMode,
-                        onReply: () => _setReplyTo(messages[index]),
-                        onDelete: () => ref.read(messagesProvider(_actualChatId).notifier).deleteMessage(messages[index].id),
+                        showDate: showDate,
+                        onReply: () => _setReplyTo(message),
+                        onDelete: () => ref.read(messagesProvider(_actualChatId).notifier).deleteMessage(message.id),
+                        onFavorite: () => _toggleFavorite(message),
+                        onTranslate: () => _translateMessage(message),
                       );
                     },
                   ),

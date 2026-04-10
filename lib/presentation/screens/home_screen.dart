@@ -25,34 +25,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: [
-          const ChatListScreen(),
-          const SettingsScreen(),
+        children: const [
+          ChatListScreen(),
+          SettingsScreen(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_bubble_outline),
-            activeIcon: const Icon(Icons.chat_bubble),
-            label: _t('chats', locale),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings_outlined),
-            activeIcon: const Icon(Icons.settings),
-            label: _t('settings', locale),
-          ),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          selectedItemColor: AppColors.primary,
+          unselectedItemColor: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+          type: BottomNavigationBarType.fixed,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.chat_bubble_outline),
+              activeIcon: const Icon(Icons.chat_bubble),
+              label: _t('chats', locale),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.settings_outlined),
+              activeIcon: const Icon(Icons.settings),
+              label: _t('settings', locale),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -60,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _t(String key, Locale locale) {
     final Map<String, Map<String, String>> translations = {
       'chats': {'en': 'Chats', 'zh': '聊天', 'zh_TW': '聊天'},
-      'settings': {'en': 'Settings', 'zh': '设置', 'zh_TW': '設定'},
+      'settings': {'en': 'Settings', 'zh': '设置', 'zh_TW': '設置'},
     };
 
     final localeKey = locale.countryCode != null ? '${locale.languageCode}_${locale.countryCode}' : locale.languageCode;

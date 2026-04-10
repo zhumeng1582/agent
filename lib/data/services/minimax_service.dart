@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'ai_service.dart';
 
 class MiniMaxService implements AIService {
@@ -19,7 +21,7 @@ class MiniMaxService implements AIService {
           'Authorization': 'Bearer $_apiKey',
         },
         body: jsonEncode({
-          'model': 'abab5.5s-chat',
+          'model': 'MiniMax-M2.7',
           'messages': [
             {'role': 'user', 'content': message}
           ],
@@ -62,7 +64,7 @@ class MiniMaxService implements AIService {
           'Authorization': 'Bearer $_apiKey',
         },
         body: jsonEncode({
-          'model': 'abab5.5s-chat',
+          'model': 'MiniMax-M2.7',
           'messages': [
             {
               'role': 'user',
@@ -105,7 +107,7 @@ class MiniMaxService implements AIService {
           'Authorization': 'Bearer $_apiKey',
         },
         body: jsonEncode({
-          'model': 'abab5.5s-chat',
+          'model': 'MiniMax-M2.7',
           'messages': [
             {'role': 'user', 'content': '请用5-10个字简洁概括用户输入的意图，作为聊天标题。例如："编程问题求助"、"旅游规划咨询"、"美食推荐"。\n\n用户输入：$message\n\n直接输出标题，不要任何解释。'}
           ],
@@ -147,7 +149,7 @@ class MiniMaxService implements AIService {
           'Authorization': 'Bearer $_apiKey',
         },
         body: jsonEncode({
-          'model': 'abab5.5s-chat',
+          'model': 'MiniMax-M2.7',
           'messages': [
             {
               'role': 'user',
@@ -183,6 +185,88 @@ class MiniMaxService implements AIService {
       }
     } catch (e) {
       return '图片';
+    }
+  }
+
+  @override
+  Future<String> textToSpeech(String text) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/t2a_v2'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': 'speech-2.8-hd',
+          'text': text,
+          'stream': false,
+          'voice_setting': {
+            'voice_id': 'female-tianmei',
+          },
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('TTS response body: ${response.body}');
+        final data = jsonDecode(response.body);
+        // MiniMax TTS returns base64 audio in data.audio
+        if (data['data'] != null && data['data']['audio'] != null) {
+          return data['data']['audio'] ?? '';
+        }
+        return '';
+      } else {
+        debugPrint('TTS API错误: ${response.statusCode} - ${response.body}');
+        return '';
+      }
+    } catch (e) {
+      debugPrint('TTS请求异常: $e');
+      return '';
+    }
+  }
+
+  @override
+  Future<String> generateImage(String prompt) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/image_generation'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+        },
+        body: jsonEncode({
+          'model': 'image-01',
+          'prompt': prompt,
+          'aspect_ratio': '1:1',
+          'response_format': 'url',
+          'n': 1,
+          'prompt_optimizer': true,
+        }),
+      );
+
+      debugPrint('Image generation response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final imageUrls = data['data']?['image_urls'] as List?;
+        String? imageUrl;
+        if (imageUrls != null && imageUrls.isNotEmpty) {
+          imageUrl = imageUrls[0] as String?;
+        }
+
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          // Return the URL directly
+          debugPrint('Generated image URL: $imageUrl');
+          return imageUrl;
+        }
+        return '';
+      } else {
+        debugPrint('Image API错误: ${response.statusCode} - ${response.body}');
+        return '';
+      }
+    } catch (e) {
+      debugPrint('图片生成异常: $e');
+      return '';
     }
   }
 }

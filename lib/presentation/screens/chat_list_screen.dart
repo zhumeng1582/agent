@@ -5,14 +5,21 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
+import '../../core/constants/search_provider.dart';
 import '../providers/chat_provider.dart';
 import 'chat_room_screen.dart';
+import 'search_screen.dart';
 
-class ChatListScreen extends ConsumerWidget {
+class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends ConsumerState<ChatListScreen> {
+  @override
+  Widget build(BuildContext context) {
     final chats = ref.watch(chatsProvider);
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
@@ -33,6 +40,17 @@ class ChatListScreen extends ConsumerWidget {
           color: isDarkMode ? Colors.white : Colors.black,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SearchScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {

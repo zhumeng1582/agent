@@ -160,6 +160,11 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     state = messages;
   }
 
+  Future<void> updateMessage(Message updatedMessage) async {
+    await _repository.saveMessage(updatedMessage);
+    state = state.map((m) => m.id == updatedMessage.id ? updatedMessage : m).toList();
+  }
+
   Future<void> sendTextMessage(String content, {String? replyToId, String? replyToContent}) async {
     // Check if this is the first user message
     final isFirstMessage = state.where((m) => m.isFromMe).isEmpty;
@@ -201,9 +206,74 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     // Check usage limit before AI reply
     final canUse = await _ref.read(usageProvider.notifier).tryUse();
     if (canUse) {
-      _addAIReply(message);
+      // Check if user wants to generate an image
+      if (_isImageGenerationRequest(content)) {
+        _addAIGeneratedImageReply(message);
+      } else {
+        _addAIReply(message);
+      }
     } else {
       _addLimitExceededMessage();
+    }
+  }
+
+  bool _isImageGenerationRequest(String content) {
+    final keywords = [
+      // Chinese
+      '生成图片', '给我一张', '画一个', '画一张', '生成一张', '创建图片', '生成一幅', '画一幅', '生成图', '给我图',
+      // English
+      'generate an image', 'generate a picture', 'create an image', 'create a picture',
+      'draw a picture', 'give me a picture', 'give me an image', 'can you draw',
+      'make an image', 'make a picture',
+    ];
+    final lower = content.toLowerCase();
+    return keywords.any((k) => lower.contains(k));
+  }
+
+  Future<void> _addAIGeneratedImageReply(Message originalMessage) async {
+    _ref.read(isLoadingProvider.notifier).state = true;
+
+    try {
+      final imagePath = await _aiService.generateImage(originalMessage.content ?? '');
+
+      if (imagePath.isNotEmpty) {
+        final reply = Message(
+          id: _uuid.v4(),
+          chatId: _chatId,
+          type: MessageType.image,
+          mediaPath: imagePath,
+          timestamp: DateTime.now(),
+          isFromMe: false,
+        );
+
+        await _repository.saveMessage(reply);
+        state = [...state, reply];
+        _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, '[图片]');
+      } else {
+        final errorReply = Message(
+          id: _uuid.v4(),
+          chatId: _chatId,
+          type: MessageType.text,
+          content: '图片生成失败，请稍后重试',
+          timestamp: DateTime.now(),
+          isFromMe: false,
+        );
+        await _repository.saveMessage(errorReply);
+        state = [...state, errorReply];
+      }
+    } catch (e) {
+      final errorReply = Message(
+        id: _uuid.v4(),
+        chatId: _chatId,
+        type: MessageType.text,
+        content: '图片生成失败: $e',
+        timestamp: DateTime.now(),
+        isFromMe: false,
+      );
+      await _repository.saveMessage(errorReply);
+      state = [...state, errorReply];
+    } finally {
+      _ref.read(isLoadingProvider.notifier).state = false;
     }
   }
 
@@ -315,6 +385,10 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
           replyContent = '收到图片';
           break;
       }
+
+      // Estimate tokens from response length (rough approximation: 1 token ≈ 2 chars)
+      final estimatedTokens = (replyContent.length / 2).ceil();
+      _ref.read(usageProvider.notifier).addTokens(estimatedTokens);
 
       final reply = Message(
         id: _uuid.v4(),

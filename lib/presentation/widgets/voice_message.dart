@@ -80,7 +80,19 @@ class _VoiceMessageState extends ConsumerState<VoiceMessage> {
             ),
             decoration: BoxDecoration(
               color: bubbleColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(widget.message.isFromMe ? 20 : 4),
+                bottomRight: Radius.circular(widget.message.isFromMe ? 4 : 20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -142,7 +154,7 @@ class _VoiceMessageState extends ConsumerState<VoiceMessage> {
               maxWidth: MediaQuery.of(context).size.width * 0.6,
             ),
             decoration: BoxDecoration(
-              color: widget.isDarkMode ? Colors.grey[700] : Colors.grey[200],
+              color: widget.isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(

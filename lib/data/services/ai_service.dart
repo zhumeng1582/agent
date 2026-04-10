@@ -4,4 +4,6 @@ abstract class AIService {
   Future<String> chatVoice(String message, String audioPath);
   Future<String> summarizeForTitle(String message);
   Future<String> summarizeImageForTitle(String imagePath);
+  Future<String> textToSpeech(String text);
+  Future<String> generateImage(String prompt);
 }

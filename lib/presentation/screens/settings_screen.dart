@@ -225,17 +225,42 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _showLanguageDialog(BuildContext context, WidgetRef ref, Locale currentLocale) {
-    showDialog(
+    final isDarkMode = ref.read(themeProvider) == ThemeMode.dark;
+    showModalBottomSheet(
       context: context,
+      backgroundColor: isDarkMode ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
-        return AlertDialog(
-          title: Text(_getLocalizedText('selectLanguage', currentLocale)),
-          content: Column(
+        return SafeArea(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildLanguageOption(context, ref, const Locale('zh'), '简体中文', currentLocale),
-              _buildLanguageOption(context, ref, const Locale('zh', 'TW'), '繁體中文', currentLocale),
-              _buildLanguageOption(context, ref, const Locale('en'), 'English', currentLocale),
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _getLocalizedText('selectLanguage', currentLocale),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+              _buildLanguageOption(context, ref, const Locale('zh'), '简体中文', currentLocale, isDarkMode),
+              _buildLanguageOption(context, ref, const Locale('zh', 'TW'), '繁體中文', currentLocale, isDarkMode),
+              _buildLanguageOption(context, ref, const Locale('en'), 'English', currentLocale, isDarkMode),
+              const SizedBox(height: 16),
             ],
           ),
         );
@@ -243,12 +268,17 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLanguageOption(BuildContext context, WidgetRef ref, Locale locale, String name, Locale currentLocale) {
+  Widget _buildLanguageOption(BuildContext context, WidgetRef ref, Locale locale, String name, Locale currentLocale, bool isDarkMode) {
     final isSelected = currentLocale.languageCode == locale.languageCode &&
         (currentLocale.countryCode == locale.countryCode || (currentLocale.countryCode == null && locale.countryCode == null));
 
     return ListTile(
-      title: Text(name),
+      title: Text(
+        name,
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
       trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
       onTap: () {
         ref.read(localeProvider.notifier).setLocale(locale);

@@ -5,7 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/font_size_provider.dart';
 import '../../data/models/message.dart';
 
-class TextMessage extends ConsumerStatefulWidget {
+class TextMessage extends ConsumerWidget {
   final Message message;
   final bool isDarkMode;
 
@@ -16,84 +16,13 @@ class TextMessage extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<TextMessage> createState() => _TextMessageState();
-}
-
-class _TextMessageState extends ConsumerState<TextMessage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<int> _characterCount;
-  String? _previousContent;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: _calculateDuration(widget.message.content ?? ''),
-      vsync: this,
-    );
-    _characterCount = IntTween(begin: 0, end: widget.message.content?.length ?? 0).animate(_controller);
-    _controller.addListener(() {
-      if (_controller.isAnimating) {
-        setState(() {});
-      }
-    });
-  }
-
-  Duration _calculateDuration(String text) {
-    // Base duration + per character duration (30ms per char, max 3 seconds)
-    final charDuration = (text.length * 30).clamp(0, 3000);
-    return Duration(milliseconds: 300 + charDuration);
-  }
-
-  @override
-  void didUpdateWidget(TextMessage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Detect content change and restart animation
-    if (widget.message.content != oldWidget.message.content &&
-        widget.message.content != _previousContent) {
-      _previousContent = widget.message.content;
-      _controller.duration = _calculateDuration(widget.message.content ?? '');
-      _characterCount = IntTween(
-        begin: 0,
-        end: widget.message.content?.length ?? 0,
-      ).animate(_controller);
-
-      if (widget.message.isStreaming) {
-        _controller.forward(from: 0);
-      } else {
-        _controller.value = 1.0;
-      }
-    } else if (widget.message.isStreaming && !oldWidget.message.isStreaming) {
-      // Streaming started - start animation
-      _controller.forward(from: 0);
-    } else if (!widget.message.isStreaming && oldWidget.message.isStreaming) {
-      // Streaming ended - complete animation immediately
-      _controller.value = 1.0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fontSize = ref.watch(fontSizeProvider);
-    final textColor = widget.message.isFromMe
+    final textColor = message.isFromMe
         ? Colors.white
-        : (widget.isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary);
+        : (isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary);
 
-    final content = widget.message.content ?? '';
-    final displayContent = _controller.isAnimating
-        ? content.substring(0, _characterCount.value.clamp(0, content.length))
-        : content;
-
-    // Show blinking cursor when streaming
-    final showCursor = widget.message.isStreaming && _controller.isAnimating;
+    final displayContent = _getDisplayContent();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -112,23 +41,38 @@ class _TextMessageState extends ConsumerState<TextMessage>
                 ),
                 code: TextStyle(
                   color: textColor,
-                  backgroundColor: widget.message.isFromMe
+                  backgroundColor: message.isFromMe
                       ? Colors.white.withValues(alpha: 0.2)
-                      : (widget.isDarkMode ? Colors.grey[600] : Colors.grey[200]),
+                      : (isDarkMode ? Colors.grey[600] : Colors.grey[200]),
                   fontSize: 14 * fontSize.scale,
                 ),
                 codeblockDecoration: BoxDecoration(
-                  color: widget.isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
+                  color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
           ),
-          if (showCursor)
-            _BlinkingCursor(color: textColor),
+          if (message.isStreaming) _buildCursor(textColor),
         ],
       ),
     );
+  }
+
+  String _getDisplayContent() {
+    final content = message.content ?? '';
+    if (!message.isStreaming || content.isEmpty) {
+      return content;
+    }
+    // Show partial content while streaming for visual effect
+    // This creates a typewriter-like visual without complex animation
+    final length = content.length;
+    final showLength = (length * 0.5).ceil().clamp(1, length);
+    return content.substring(0, showLength);
+  }
+
+  Widget _buildCursor(Color color) {
+    return _BlinkingCursor(color: color);
   }
 }
 

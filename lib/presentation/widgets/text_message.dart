@@ -5,7 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/font_size_provider.dart';
 import '../../data/models/message.dart';
 
-class TextMessage extends ConsumerWidget {
+class TextMessage extends ConsumerStatefulWidget {
   final Message message;
   final bool isDarkMode;
 
@@ -16,14 +16,64 @@ class TextMessage extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fontSize = ref.watch(fontSizeProvider);
-    final textColor = message.isFromMe
-        ? Colors.white
-        : (isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary);
+  ConsumerState<TextMessage> createState() => _TextMessageState();
+}
 
-    final displayContent = _getDisplayContent();
-    final streaming = message.isStreaming ?? false;
+class _TextMessageState extends ConsumerState<TextMessage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _shouldAnimate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: _calculateDuration(widget.message.content ?? ''),
+      vsync: this,
+    );
+
+    _shouldAnimate = widget.message.isStreaming == true;
+    if (_shouldAnimate) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(TextMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Check if this is a new streaming message
+    if (widget.message.content != oldWidget.message.content &&
+        widget.message.isStreaming == true) {
+      _shouldAnimate = true;
+      _controller.duration = _calculateDuration(widget.message.content ?? '');
+      _controller.forward(from: 0);
+    }
+  }
+
+  Duration _calculateDuration(String text) {
+    // 30ms per character, min 300ms, max 3 seconds
+    final charDuration = (text.length * 30).clamp(300, 3000);
+    return Duration(milliseconds: charDuration);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = ref.watch(fontSizeProvider);
+    final textColor = widget.message.isFromMe
+        ? Colors.white
+        : (widget.isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary);
+
+    final content = widget.message.content ?? '';
+    final displayContent = _shouldAnimate && _controller.isAnimating
+        ? _getPartialContent(content, _controller.value)
+        : content;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -42,38 +92,29 @@ class TextMessage extends ConsumerWidget {
                 ),
                 code: TextStyle(
                   color: textColor,
-                  backgroundColor: message.isFromMe
+                  backgroundColor: widget.message.isFromMe
                       ? Colors.white.withValues(alpha: 0.2)
-                      : (isDarkMode ? Colors.grey[600] : Colors.grey[200]),
+                      : (widget.isDarkMode ? Colors.grey[600] : Colors.grey[200]),
                   fontSize: 14 * fontSize.scale,
                 ),
                 codeblockDecoration: BoxDecoration(
-                  color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
+                  color: widget.isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
           ),
-          if (streaming) _buildCursor(textColor),
+          if (_shouldAnimate && _controller.isAnimating)
+            _BlinkingCursor(color: textColor),
         ],
       ),
     );
   }
 
-  String _getDisplayContent() {
-    final content = message.content ?? '';
-    final streaming = message.isStreaming ?? false;
-    if (!streaming || content.isEmpty) {
-      return content;
-    }
-    // Show partial content while streaming for visual effect
-    final length = content.length;
-    final showLength = (length * 0.5).ceil().clamp(1, length);
-    return content.substring(0, showLength);
-  }
-
-  Widget _buildCursor(Color color) {
-    return _BlinkingCursor(color: color);
+  String _getPartialContent(String fullContent, double progress) {
+    if (fullContent.isEmpty) return '';
+    final charCount = (fullContent.length * progress).ceil().clamp(1, fullContent.length);
+    return fullContent.substring(0, charCount);
   }
 }
 

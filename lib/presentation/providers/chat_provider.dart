@@ -518,36 +518,32 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       }
 
       // Add current message
+      String userContent;
       switch (originalMessage.type) {
         case MessageType.text:
-          messages.add({
-            'role': 'user',
-            'content': originalMessage.content ?? '',
-          });
-          replyContent = await _aiService.chat(messages);
+          userContent = originalMessage.content ?? '';
           break;
         case MessageType.voice:
-          messages.add({
-            'role': 'user',
-            'content': originalMessage.content ?? '语音消息',
-          });
-          replyContent = await _aiService.chat(messages);
+          userContent = originalMessage.content ?? '语音消息';
           break;
         case MessageType.image:
-          messages.add({
-            'role': 'user',
-            'content': '用户发送了一张图片',
-          });
-          replyContent = await _aiService.chat(messages);
+          userContent = '用户发送了一张图片';
           break;
         case MessageType.video:
-          messages.add({
-            'role': 'user',
-            'content': '用户发送了一个视频',
-          });
-          replyContent = await _aiService.chat(messages);
+          userContent = '用户发送了一个视频';
           break;
       }
+
+      // Include reply context if this is a reply
+      if (originalMessage.replyToContent != null && originalMessage.replyToContent!.isNotEmpty) {
+        userContent = '用户在回复中引用了"${originalMessage.replyToContent}"，并说：\n\n$userContent';
+      }
+
+      messages.add({
+        'role': 'user',
+        'content': userContent,
+      });
+      replyContent = await _aiService.chat(messages);
 
       // Estimate tokens from response length (rough approximation: 1 token ≈ 2 chars)
       final estimatedTokens = (replyContent.length / 2).ceil();

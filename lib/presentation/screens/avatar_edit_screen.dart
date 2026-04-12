@@ -19,18 +19,18 @@ class AvatarEditScreen extends ConsumerWidget {
     final nickname = ref.watch(nicknameProvider);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey[900] : AppColors.background,
+      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
         title: Text(
           _t('profile', locale),
           style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
+            color: isDarkMode ? Colors.white : AppColors.textPrimary,
           ),
         ),
-        backgroundColor: isDarkMode ? Colors.grey[850] : AppColors.surface,
-        elevation: 1,
+        backgroundColor: isDarkMode ? AppColors.surfaceDark : AppColors.surface,
+        elevation: 0,
         iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
+          color: isDarkMode ? Colors.white : AppColors.textPrimary,
         ),
       ),
       body: SingleChildScrollView(

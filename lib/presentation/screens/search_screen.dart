@@ -133,10 +133,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.grey[900] : AppColors.background,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+        backgroundColor: isDarkMode ? AppColors.surfaceDark : Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
+          icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: TextField(

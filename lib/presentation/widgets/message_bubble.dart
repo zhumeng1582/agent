@@ -87,6 +87,16 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
 
     _removeOverlay();
 
+    // Calculate if message is in lower half of screen
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    bool showMenuAbove = true;
+    if (renderBox != null) {
+      final messagePosition = renderBox.localToGlobal(Offset.zero);
+      final screenHeight = MediaQuery.of(context).size.height;
+      // If message is in lower 40% of screen, show menu above
+      showMenuAbove = messagePosition.dy > screenHeight * 0.4;
+    }
+
     final overlay = Overlay.of(context);
 
     _overlayEntry = OverlayEntry(
@@ -94,6 +104,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         message: widget.message,
         isDarkMode: widget.isDarkMode,
         layerLink: _layerLink,
+        showMenuAbove: showMenuAbove,
         onDismiss: _removeOverlay,
         onReply: () {
           _removeOverlay();
@@ -544,6 +555,7 @@ class _FloatingMessageMenu extends StatelessWidget {
   final Message message;
   final bool isDarkMode;
   final LayerLink layerLink;
+  final bool showMenuAbove;
   final VoidCallback onDismiss;
   final VoidCallback onReply;
   final VoidCallback onCopy;
@@ -557,6 +569,7 @@ class _FloatingMessageMenu extends StatelessWidget {
     required this.message,
     required this.isDarkMode,
     required this.layerLink,
+    required this.showMenuAbove,
     required this.onDismiss,
     required this.onReply,
     required this.onCopy,
@@ -584,9 +597,9 @@ class _FloatingMessageMenu extends StatelessWidget {
           width: 200,
           child: CompositedTransformFollower(
             link: layerLink,
-            targetAnchor: Alignment.bottomRight,
-            followerAnchor: Alignment.topRight,
-            offset: const Offset(0, -8),
+            targetAnchor: showMenuAbove ? Alignment.bottomRight : Alignment.topRight,
+            followerAnchor: showMenuAbove ? Alignment.topRight : Alignment.bottomRight,
+            offset: showMenuAbove ? const Offset(0, -8) : const Offset(0, 8),
             child: Material(
               elevation: 8,
               borderRadius: BorderRadius.circular(16),

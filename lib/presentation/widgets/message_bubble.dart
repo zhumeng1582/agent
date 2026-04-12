@@ -78,7 +78,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     _exitSelectionMode();
   }
 
-  void _showFloatingMenu(BuildContext context, Offset tapPosition) {
+  void _showFloatingMenu(BuildContext context) {
     if (_isMenuVisible) {
       _removeOverlay();
       return;
@@ -86,22 +86,17 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
 
     _removeOverlay();
 
-    // Get absolute position of the tap point
+    // Get absolute position of the message bubble
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
     final menuWidth = 200.0;
     final screenSize = MediaQuery.of(context).size;
-    final tapGlobalPosition = renderBox.localToGlobal(tapPosition);
+    final bubblePosition = renderBox.localToGlobal(Offset.zero);
+    final bubbleSize = renderBox.size;
 
-    // Determine horizontal position
-    double left = tapGlobalPosition.dx;
-    bool alignLeft = false;
-    // If tap is in right half, align menu to left of tap point
-    if (tapPosition.dx > renderBox.size.width / 2) {
-      left = tapGlobalPosition.dx - menuWidth + 16;
-      alignLeft = true;
-    }
+    // Determine horizontal position - use bubble's right side
+    double left = bubblePosition.dx + bubbleSize.width - menuWidth - 8;
     // Ensure menu stays within screen bounds
     if (left < 8) left = 8;
     if (left + menuWidth > screenSize.width - 8) {
@@ -111,7 +106,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     // Determine vertical position - check if need to show above
     bool showMenuAbove = false;
     // If not enough space below (screen height - 100px margin), show above
-    if (tapGlobalPosition.dy + 300 > screenSize.height - 100) {
+    if (bubblePosition.dy + bubbleSize.height + 300 > screenSize.height - 100) {
       showMenuAbove = true;
     }
 
@@ -121,9 +116,9 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
       builder: (context) => _FloatingMessageMenu(
         message: widget.message,
         isDarkMode: widget.isDarkMode,
-        menuPosition: Offset(left, tapGlobalPosition.dy),
+        menuPosition: Offset(left, bubblePosition.dy + bubbleSize.height),
         showMenuAbove: showMenuAbove,
-        alignLeft: alignLeft,
+        alignLeft: false,
         onDismiss: _removeOverlay,
         onReply: () {
           _removeOverlay();
@@ -224,8 +219,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
           ),
         // Message bubble
         GestureDetector(
-          onLongPressDown: (details) => _showFloatingMenu(context, details.localPosition),
-          onSecondaryTapDown: (details) => _showFloatingMenu(context, details.localPosition),
+          onLongPress: () => _showFloatingMenu(context),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             width: double.infinity,

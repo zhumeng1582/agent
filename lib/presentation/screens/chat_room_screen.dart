@@ -270,8 +270,17 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
 
     ref.listen(messagesProvider(_actualChatId), (previous, next) {
       if (previous != null && next.length > previous.length) {
+        // New message added - scroll to bottom
         if (_initialized) {
           _scrollToBottom();
+        }
+      } else if (previous != null && next.length == previous.length) {
+        // Message updated (e.g., streaming completed) - check if should scroll
+        if (_initialized && !_userHasScrolledUp) {
+          final hasStreaming = next.any((m) => m.isStreaming == true);
+          if (hasStreaming) {
+            _scrollToBottom();
+          }
         }
       }
     });

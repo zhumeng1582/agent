@@ -39,6 +39,7 @@ class TextMessage extends ConsumerWidget {
                 height: 1.4,
               ),
               speed: const Duration(milliseconds: 30),
+              cursor: '|',  // Vertical bar cursor
             ),
           ],
           isRepeatingAnimation: false,

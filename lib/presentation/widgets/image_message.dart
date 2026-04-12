@@ -20,30 +20,30 @@ class ImageMessage extends StatelessWidget {
       onTap: () => _showImageViewer(context),
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.6,
-          maxHeight: 300,
+          maxWidth: MediaQuery.of(context).size.width * 0.65,
+          maxHeight: 280,
         ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
+              color: Colors.black.withValues(alpha: 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           child: _isNetworkImage
               ? CachedNetworkImage(
                   imageUrl: message.mediaPath!,
-                  width: 200,
-                  height: 200,
+                  width: 220,
+                  height: 220,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(
-                    width: 200,
-                    height: 200,
+                    width: 220,
+                    height: 220,
                     color: Colors.grey[200],
                     child: const Center(
                       child: CircularProgressIndicator(),
@@ -53,8 +53,8 @@ class ImageMessage extends StatelessWidget {
                 )
               : Image.file(
                   File(message.mediaPath!),
-                  width: 200,
-                  height: 200,
+                  width: 220,
+                  height: 220,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return _buildErrorWidget();

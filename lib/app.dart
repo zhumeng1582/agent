@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/constants/app_colors.dart';
@@ -44,12 +45,31 @@ class App extends ConsumerWidget {
     }
   }
 
+  void _updateSystemNavBarColor(BuildContext context, ThemeMode mode) {
+    // 当 ThemeMode.system 时，需要获取系统实际亮度
+    Brightness brightness;
+    if (mode == ThemeMode.system) {
+      brightness = MediaQuery.platformBrightnessOf(context);
+    } else {
+      brightness = mode == ThemeMode.dark ? Brightness.dark : Brightness.light;
+    }
+
+    final isDark = brightness == Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      systemNavigationBarColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF2F2F7),
+      systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+    ));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
     final locale = ref.watch(localeProvider);
     final fontSizeState = ref.watch(fontSizeProvider);
     final scale = fontSizeState.scale;
+
+    // 动态更新导航栏颜色
+    _updateSystemNavBarColor(context, themeMode);
 
     return MaterialApp(
       title: _getLocalizedTitle(locale),

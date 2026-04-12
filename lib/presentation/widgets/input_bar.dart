@@ -31,11 +31,29 @@ class InputBar extends ConsumerStatefulWidget {
 
 class _InputBarState extends ConsumerState<InputBar> {
   final _textController = TextEditingController();
+  final _focusNode = FocusNode();
   bool _isRecording = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final hasText = _textController.text.trim().isNotEmpty;
+    if (hasText != _hasText) {
+      setState(() {
+        _hasText = hasText;
+      });
+    }
+  }
 
   @override
   void dispose() {
     _textController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -48,6 +66,8 @@ class _InputBarState extends ConsumerState<InputBar> {
       'microphonePermission': {'en': 'Microphone permission required', 'zh': '需要麦克风权限来录制语音', 'zh_TW': '需要麥克風權限來錄製語音'},
       'recording': {'en': 'Recording...', 'zh': '正在录音...', 'zh_TW': '正在錄音...'},
       'typeMessage': {'en': 'Type a message...', 'zh': '输入消息...', 'zh_TW': '輸入消息...'},
+      'holdToTalk': {'en': 'Hold to talk', 'zh': '按住说话', 'zh_TW': '按住說話'},
+      'slideToCancel': {'en': 'Slide to cancel', 'zh': '滑动取消', 'zh_TW': '滑動取消'},
     };
 
     final localeKey = widget.locale.countryCode != null ? '${widget.locale.languageCode}_${widget.locale.countryCode}' : widget.locale.languageCode;
@@ -70,6 +90,7 @@ class _InputBarState extends ConsumerState<InputBar> {
     final replyToContent = widget.replyToMessage?.content;
 
     _textController.clear();
+    _focusNode.unfocus();
     widget.onCancelReply?.call();
     await ref.read(messagesProvider(widget.chatId).notifier).sendTextMessage(
       text,
@@ -194,46 +215,299 @@ class _InputBarState extends ConsumerState<InputBar> {
     ref.read(recordingPathProvider.notifier).state = null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final themeMode = ref.watch(themeProvider);
+  void _showMoreOptions() {
+    final themeMode = ref.read(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[850] : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDarkMode ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (_isRecording) _buildRecordingIndicator(isDarkMode),
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildMediaButton(icon: Icons.image_rounded, onTap: _pickImage, isDarkMode: isDarkMode),
-                _buildMediaButton(icon: Icons.camera_alt_rounded, onTap: _takePhoto, isDarkMode: isDarkMode),
-                Expanded(child: _buildTextField(isDarkMode)),
-                const SizedBox(width: 8),
-                _isRecording ? _buildRecordingControls(isDarkMode) : _buildSendButton(),
+                _buildOptionButton(
+                  icon: Icons.photo_library_rounded,
+                  label: '相册',
+                  color: AppColors.primary,
+                  isDarkMode: isDarkMode,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage();
+                  },
+                ),
+                _buildOptionButton(
+                  icon: Icons.camera_alt_rounded,
+                  label: '拍照',
+                  color: AppColors.secondary,
+                  isDarkMode: isDarkMode,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _takePhoto();
+                  },
+                ),
               ],
             ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? AppColors.inputBackgroundDark : AppColors.inputBackground,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  _t('cancel'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : AppColors.textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildOptionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    required bool isDarkMode,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color, color.withValues(alpha: 0.7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeProvider);
+    final isDarkMode = themeMode == ThemeMode.dark;
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 12,
+        right: 12,
+        top: 8,
+        bottom: MediaQuery.of(context).padding.bottom + 8,
+      ),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppColors.surfaceDark : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isRecording) _buildRecordingIndicator(isDarkMode),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // More options button (+)
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? AppColors.inputBackgroundDark
+                      : AppColors.inputBackground,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.add_rounded,
+                    color: isDarkMode ? Colors.white : AppColors.textSecondary,
+                    size: 24,
+                  ),
+                  onPressed: _showMoreOptions,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Text field
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? AppColors.inputBackgroundDark
+                        : AppColors.inputBackground,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDarkMode
+                          ? AppColors.inputBorderDark
+                          : AppColors.inputBorder,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          focusNode: _focusNode,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : AppColors.textPrimary,
+                            fontSize: 16,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: _t('typeMessage'),
+                            hintStyle: TextStyle(
+                              color: isDarkMode ? Colors.grey[500] : AppColors.textSecondary,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendText(),
+                          maxLines: null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Send or Mic button
+              _hasText
+                  ? _buildSendButton()
+                  : _buildMicButton(isDarkMode),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSendButton() {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+        onPressed: _sendText,
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+
+  Widget _buildMicButton(bool isDarkMode) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppColors.inputBackgroundDark : AppColors.inputBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: IconButton(
+        icon: Icon(
+          Icons.mic_rounded,
+          color: AppColors.primary,
+          size: 22,
+        ),
+        onPressed: _startRecording,
+        padding: EdgeInsets.zero,
+      ),
+    );
+  }
+
   Widget _buildRecordingIndicator(bool isDarkMode) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+          ),
+        ],
+      ),
       child: Row(
         children: [
           Container(
@@ -244,87 +518,56 @@ class _InputBarState extends ConsumerState<InputBar> {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Text(
             _t('recording'),
-            style: TextStyle(color: isDarkMode ? Colors.grey[300] : Colors.red),
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: _cancelRecording,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                _t('slideToCancel'),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.grey[700],
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: _stopRecording,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryLight],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMediaButton({required IconData icon, required VoidCallback onTap, required bool isDarkMode}) {
-    return IconButton(
-      icon: Icon(icon, color: AppColors.primary),
-      onPressed: onTap,
-    );
-  }
-
-  Widget _buildTextField(bool isDarkMode) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDarkMode ? Colors.grey[600]! : Colors.grey[300]!,
-          width: 1,
-        ),
-      ),
-      child: TextField(
-        controller: _textController,
-        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        decoration: InputDecoration(
-          hintText: _t('typeMessage'),
-          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[500]),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        ),
-        textInputAction: TextInputAction.send,
-        onSubmitted: (_) => _sendText(),
-      ),
-    );
-  }
-
-  Widget _buildSendButton() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        shape: BoxShape.circle,
-      ),
-      child: IconButton(
-        icon: const Icon(Icons.mic, color: Colors.white),
-        onPressed: _startRecording,
-      ),
-    );
-  }
-
-  Widget _buildRecordingControls(bool isDarkMode) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: _cancelRecording,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.send, color: Colors.white),
-            onPressed: _stopRecording,
-          ),
-        ),
-      ],
     );
   }
 }

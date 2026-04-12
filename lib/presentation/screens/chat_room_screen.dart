@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
-import '../../core/constants/chat_background_provider.dart';
 import '../../core/constants/translation_provider.dart';
 import '../../core/constants/translation_state_provider.dart';
+import '../../core/constants/font_size_provider.dart';
 import '../../data/models/message.dart';
 import '../../data/services/database_service.dart';
 import '../providers/chat_provider.dart';
@@ -88,15 +88,6 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     }
   }
 
-  void _ensureChatCreated() {
-    if (widget.isTempChat) {
-      final chats = ref.read(chatsProvider);
-      if (chats.isEmpty || chats.any((c) => c.id == widget.chatId)) {
-        ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
-      }
-    }
-  }
-
   void _setReplyTo(Message message) {
     setState(() {
       _replyToMessage = message;
@@ -154,7 +145,6 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       'cancel': {'en': 'Cancel', 'zh': '取消', 'zh_TW': '取消'},
       'confirm': {'en': 'Confirm', 'zh': '确定', 'zh_TW': '確定'},
       'startChatting': {'en': 'Start chatting\nSend text, image or voice messages', 'zh': '开始聊天吧\n发送文本、图片或语音消息', 'zh_TW': '開始聊天吧\n發送文本、圖片或語音訊息'},
-      'selectBackground': {'en': 'Select Background', 'zh': '选择背景', 'zh_TW': '選擇背景'},
     };
 
     final localeKey = locale.countryCode != null ? '${locale.languageCode}_${locale.countryCode}' : locale.languageCode;
@@ -162,7 +152,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   }
 
   Widget _buildLoadingIndicator(bool isDarkMode, Locale locale) {
-    final isLoading = ref.watch(isLoadingProvider);
+    final loadingChatIds = ref.watch(loadingChatIdsProvider);
+    final isLoading = loadingChatIds.contains(_actualChatId);
     if (!isLoading) return const SizedBox.shrink();
 
     return Container(
@@ -174,7 +165,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           Text(
             _t('aiThinking', locale),
             style: TextStyle(
-              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
             ),
           ),
         ],
@@ -185,13 +176,14 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   Widget _buildReplyBanner() {
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
+    final fontSize = ref.watch(fontSizeProvider);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+        color: isDarkMode ? AppColors.surfaceDark : Colors.white,
         border: Border(
-          top: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
+          top: BorderSide(color: isDarkMode ? AppColors.inputBorderDark : AppColors.inputBorder),
         ),
       ),
       child: Row(
@@ -200,7 +192,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             width: 3,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              gradient: const LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryLight],
+              ),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -212,17 +206,17 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                 Text(
                   '引用回复',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.0 * fontSize.scale,
                     color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _replyToMessage?.replyPreview ?? '',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                    fontSize: 13.0 * fontSize.scale,
+                    color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -231,7 +225,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+            icon: Icon(Icons.close, color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary),
             onPressed: _cancelReply,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -247,7 +241,6 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
     final locale = ref.watch(localeProvider);
-    final bgState = ref.watch(chatBackgroundProvider);
 
     ref.listen(messagesProvider(_actualChatId), (previous, next) {
       if (previous != null && next.length > previous.length) {
@@ -258,24 +251,25 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     });
 
     return Scaffold(
-      backgroundColor: bgState.customColor,
+      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
         title: Text(
           _chatTitle,
           style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
+            color: isDarkMode ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: isDarkMode ? Colors.grey[850] : AppColors.surface,
-        elevation: 1,
+        backgroundColor: isDarkMode ? AppColors.surfaceDark : AppColors.surface,
+        elevation: 0,
         iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
+          color: isDarkMode ? Colors.white : AppColors.textPrimary,
         ),
         actions: [
           IconButton(
             icon: Icon(
               Icons.search,
-              color: isDarkMode ? Colors.white : Colors.black,
+              color: isDarkMode ? Colors.white : AppColors.textPrimary,
             ),
             onPressed: () {
               Navigator.push(
@@ -289,7 +283,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           IconButton(
             icon: Icon(
               Icons.more_vert,
-              color: isDarkMode ? Colors.white : Colors.black,
+              color: isDarkMode ? Colors.white : AppColors.textPrimary,
             ),
             onPressed: () {
               Navigator.push(
@@ -313,68 +307,83 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 64,
-                          color: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _t('startChatting', locale),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey,
-                            fontSize: 16,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: messages.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.primary.withValues(alpha: 0.2),
+                                  AppColors.primary.withValues(alpha: 0.1),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 40,
+                              color: AppColors.primary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      final showDate = index == 0 ||
-                          !_isSameDay(messages[index - 1].timestamp, message.timestamp);
+                          const SizedBox(height: 20),
+                          Text(
+                            _t('startChatting', locale),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        final showDate = index == 0 ||
+                            !_isSameDay(messages[index - 1].timestamp, message.timestamp);
 
-                      return MessageBubble(
-                        key: ValueKey(message.id),
-                        message: message,
-                        isDarkMode: isDarkMode,
-                        showDate: showDate,
-                        onReply: () => _setReplyTo(message),
-                        onDelete: () => ref.read(messagesProvider(_actualChatId).notifier).deleteMessage(message.id),
-                        onFavorite: () => _toggleFavorite(message),
-                        onTranslate: () => _translateMessage(message),
-                      );
-                    },
-                  ),
-          ),
-          if (_replyToMessage != null) _buildReplyBanner(),
-          _buildLoadingIndicator(isDarkMode, locale),
-          InputBar(
-            chatId: _actualChatId,
-            isTempChat: widget.isTempChat,
-            locale: locale,
-            replyToMessage: _replyToMessage,
-            onCancelReply: _cancelReply,
-            onFirstMessageSent: () {
-              if (widget.isTempChat) {
-                ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
-              }
-            },
-          ),
-        ],
+                        return MessageBubble(
+                          key: ValueKey(message.id),
+                          message: message,
+                          isDarkMode: isDarkMode,
+                          showDate: showDate,
+                          onReply: () => _setReplyTo(message),
+                          onDelete: () => ref.read(messagesProvider(_actualChatId).notifier).deleteMessage(message.id),
+                          onFavorite: () => _toggleFavorite(message),
+                          onTranslate: () => _translateMessage(message),
+                        );
+                      },
+                    ),
+            ),
+            if (_replyToMessage != null) _buildReplyBanner(),
+            _buildLoadingIndicator(isDarkMode, locale),
+            InputBar(
+              chatId: _actualChatId,
+              isTempChat: widget.isTempChat,
+              locale: locale,
+              replyToMessage: _replyToMessage,
+              onCancelReply: _cancelReply,
+              onFirstMessageSent: () {
+                if (widget.isTempChat) {
+                  ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -409,36 +418,52 @@ class _TypingIndicatorState extends State<_TypingIndicator> with SingleTickerPro
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      height: 20,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (index) {
-              final delay = index * 0.2;
-              final value = ((_controller.value - delay) % 1.0);
-              final opacity = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(0.3, 1.0);
-              final scale = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(0.5, 1.0);
-              return Transform.scale(
-                scale: scale,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: widget.isDarkMode
-                        ? Colors.white.withValues(alpha: opacity)
-                        : AppColors.primary.withValues(alpha: opacity),
-                    shape: BoxShape.circle,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: widget.isDarkMode ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: SizedBox(
+        width: 36,
+        height: 20,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (index) {
+                final delay = index * 0.2;
+                final value = ((_controller.value - delay) % 1.0);
+                final opacity = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(0.3, 1.0);
+                final scale = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(0.5, 1.0);
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withValues(alpha: opacity),
+                          AppColors.primaryLight.withValues(alpha: opacity),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-              );
-            }),
-          );
-        },
+                );
+              }),
+            );
+          },
+        ),
       ),
     );
   }

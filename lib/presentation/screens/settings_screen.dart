@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
       subtitle: Text(
-        '${remaining}/100 ${_getLocalizedText('remaining', locale)}',
+        '$remaining/100 ${_getLocalizedText('remaining', locale)}',
         style: TextStyle(
           color: isLimited
               ? Colors.red
@@ -288,34 +288,6 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSwitchTile({
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-    required bool isDarkMode,
-  }) {
-    return ListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: AppColors.primary,
-      ),
-    );
-  }
-
   Widget _buildThemeModeTile(BuildContext context, WidgetRef ref, Locale currentLocale, bool isDarkMode) {
     final themeMode = ref.watch(themeProvider);
     String themeText;
@@ -326,12 +298,12 @@ class SettingsScreen extends ConsumerWidget {
         themeIcon = Icons.light_mode;
         break;
       case ThemeMode.dark:
-        themeText = _getLocalizedText('darkMode', currentLocale);
+        themeText = _getLocalizedText('dark', currentLocale);
         themeIcon = Icons.dark_mode;
         break;
       case ThemeMode.system:
         themeText = _getLocalizedText('systemMode', currentLocale);
-        themeIcon = Icons.brightness_auto;
+        themeIcon = Icons.settings_suggest;
         break;
     }
 
@@ -392,7 +364,7 @@ class SettingsScreen extends ConsumerWidget {
               context,
               ref,
               ThemeMode.system,
-              Icons.brightness_auto,
+              Icons.settings_suggest,
               _getLocalizedText('systemMode', currentLocale),
               currentMode == ThemeMode.system,
               isDarkMode,
@@ -607,7 +579,7 @@ class SettingsScreen extends ConsumerWidget {
       'darkModeSubtitle': {'en': 'Enable dark theme', 'zh': '开启后应用将使用深色主题', 'zh_TW': '開啟後應用將使用深色主題'},
       'theme': {'en': 'Theme', 'zh': '主题', 'zh_TW': '主題'},
       'lightMode': {'en': 'Light', 'zh': '浅色', 'zh_TW': '淺色'},
-      'darkMode': {'en': 'Dark', 'zh': '深色', 'zh_TW': '深色'},
+      'dark': {'en': 'Dark', 'zh': '深色', 'zh_TW': '深色'},
       'systemMode': {'en': 'System', 'zh': '跟随系统', 'zh_TW': '跟隨系統'},
       'selectTheme': {'en': 'Select Theme', 'zh': '选择主题', 'zh_TW': '選擇主題'},
       'about': {'en': 'About', 'zh': '关于', 'zh_TW': '關於'},

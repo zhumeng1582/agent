@@ -4,13 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/avatar_provider.dart';
 import '../../core/constants/tts_provider.dart';
 import '../../core/constants/translation_state_provider.dart';
+import '../../core/constants/font_size_provider.dart';
 import '../../data/models/message.dart';
 import 'text_message.dart';
 import 'image_message.dart';
 import 'voice_message.dart';
+import 'video_message.dart';
 
 class MessageBubble extends ConsumerWidget {
   final Message message;
@@ -18,7 +19,6 @@ class MessageBubble extends ConsumerWidget {
   final bool showDate;
   final VoidCallback? onReply;
   final VoidCallback? onDelete;
-  final Function(String)? onForward;
   final VoidCallback? onFavorite;
   final VoidCallback? onTranslate;
 
@@ -29,7 +29,6 @@ class MessageBubble extends ConsumerWidget {
     this.showDate = false,
     this.onReply,
     this.onDelete,
-    this.onForward,
     this.onFavorite,
     this.onTranslate,
   });
@@ -38,6 +37,7 @@ class MessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timeFormat = DateFormat('HH:mm');
     final isFromMe = message.isFromMe;
+    final fontSize = ref.watch(fontSizeProvider);
 
     return Column(
       children: [
@@ -45,16 +45,19 @@ class MessageBubble extends ConsumerWidget {
         if (showDate)
           Container(
             margin: const EdgeInsets.symmetric(vertical: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+              color: isDarkMode
+                  ? AppColors.surfaceDark.withValues(alpha: 0.8)
+                  : AppColors.background,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               _formatDate(message.timestamp),
               style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                fontSize: 12.0 * fontSize.scale,
+                color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -62,7 +65,7 @@ class MessageBubble extends ConsumerWidget {
         GestureDetector(
           onLongPress: () => _showMessageMenu(context),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               mainAxisAlignment:
                   isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -74,10 +77,10 @@ class MessageBubble extends ConsumerWidget {
                         isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
                       // Reply quote
-                      if (message.replyToContent != null) _buildReplyQuote(),
+                      if (message.replyToContent != null) _buildReplyQuote(fontSize),
                       // Message content with bubble
                       _buildBubble(context, isFromMe),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       // Timestamp, status, TTS button and favorite
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -85,8 +88,8 @@ class MessageBubble extends ConsumerWidget {
                           Text(
                             timeFormat.format(message.timestamp),
                             style: TextStyle(
-                              fontSize: 10,
-                              color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                              fontSize: 11.0 * fontSize.scale,
+                              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                             ),
                           ),
                           if (isFromMe) ...[
@@ -94,7 +97,7 @@ class MessageBubble extends ConsumerWidget {
                             Icon(
                               Icons.done_all,
                               size: 14,
-                              color: isDarkMode ? Colors.grey[500] : Colors.grey[400],
+                              color: AppColors.primary.withValues(alpha: 0.7),
                             ),
                           ],
                           if (!isFromMe && message.type == MessageType.text) ...[
@@ -130,7 +133,30 @@ class MessageBubble extends ConsumerWidget {
   Widget _buildBubble(BuildContext context, bool isFromMe) {
     return Container(
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
+        maxWidth: MediaQuery.of(context).size.width * 0.72,
+      ),
+      decoration: BoxDecoration(
+        gradient: isFromMe
+            ? const LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isFromMe ? null : (isDarkMode ? AppColors.receivedBubbleDark : AppColors.receivedBubble),
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(18),
+          topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(isFromMe ? 18 : 4),
+          bottomRight: Radius.circular(isFromMe ? 4 : 18),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isFromMe ? AppColors.primary : Colors.black).withValues(alpha: isFromMe ? 0.15 : 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: _buildMessageContent(),
     );
@@ -138,14 +164,17 @@ class MessageBubble extends ConsumerWidget {
 
   Widget _buildTranslationDisplay(WidgetRef ref) {
     final isLoading = ref.watch(translationLoadingProvider).contains(message.id);
+    final fontSize = ref.watch(fontSizeProvider);
 
     if (isLoading) {
       return Container(
-        margin: const EdgeInsets.only(top: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
+          color: isDarkMode
+              ? AppColors.surfaceDark.withValues(alpha: 0.6)
+              : Colors.grey[100],
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -155,15 +184,15 @@ class MessageBubble extends ConsumerWidget {
               height: 12,
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(width: 6),
             Text(
               '翻译中...',
               style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                fontSize: 12.0 * fontSize.scale,
+                color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -175,21 +204,22 @@ class MessageBubble extends ConsumerWidget {
     if (message.translatedContent != null && message.translatedContent!.isNotEmpty) {
       return GestureDetector(
         onLongPress: () {
-          // Clear translation on long press
           onTranslate?.call();
         },
         child: Container(
-          margin: const EdgeInsets.only(top: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          margin: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
-            borderRadius: BorderRadius.circular(8),
+            color: isDarkMode
+                ? AppColors.surfaceDark.withValues(alpha: 0.6)
+                : Colors.grey[100],
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             message.translatedContent!,
             style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+              fontSize: 13.0 * fontSize.scale,
+              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -200,12 +230,14 @@ class MessageBubble extends ConsumerWidget {
     return const SizedBox.shrink();
   }
 
-  Widget _buildReplyQuote() {
+  Widget _buildReplyQuote(FontSizeState fontSize) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.5) : Colors.grey[100],
+        color: isDarkMode
+            ? AppColors.surfaceDark.withValues(alpha: 0.5)
+            : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -218,56 +250,13 @@ class MessageBubble extends ConsumerWidget {
       child: Text(
         message.replyPreview,
         style: TextStyle(
-          fontSize: 12,
-          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+          fontSize: 13.0 * fontSize.scale,
+          color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
         ),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
     );
-  }
-
-  Widget _buildAvatar({required bool isFromMe, required AvatarState avatarState}) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: isFromMe
-          ? _buildUserAvatar(avatarState)
-          : CircleAvatar(
-              radius: 20,
-              backgroundColor: AppColors.secondary,
-              child: const Icon(
-                Icons.smart_toy,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-    );
-  }
-
-  Widget _buildUserAvatar(AvatarState avatarState) {
-    if (avatarState.customAvatarPath != null) {
-      return ClipOval(
-        child: Image.file(
-          File(avatarState.customAvatarPath!),
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return DefaultAvatars.buildAvatar(avatarState.selectedDefaultIndex);
-          },
-        ),
-      );
-    }
-    return DefaultAvatars.buildAvatar(avatarState.selectedDefaultIndex);
   }
 
   void _showMessageMenu(BuildContext context) {
@@ -497,40 +486,8 @@ class MessageBubble extends ConsumerWidget {
         return ImageMessage(message: message);
       case MessageType.voice:
         return VoiceMessage(message: message, isDarkMode: isDarkMode);
+      case MessageType.video:
+        return VideoMessage(message: message);
     }
   }
-}
-
-class _BubbleTailPainter extends CustomPainter {
-  final bool isFromMe;
-  final Color color;
-
-  _BubbleTailPainter({required this.isFromMe, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    if (isFromMe) {
-      path.moveTo(size.width, 0);
-      path.lineTo(0, size.height * 0.6);
-      path.quadraticBezierTo(0, size.height, size.width * 0.3, size.height);
-      path.lineTo(size.width, size.height);
-      path.lineTo(size.width, 0);
-    } else {
-      path.moveTo(0, 0);
-      path.lineTo(size.width, size.height * 0.6);
-      path.quadraticBezierTo(size.width, size.height, size.width * 0.7, size.height);
-      path.lineTo(0, size.height);
-      path.lineTo(0, 0);
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

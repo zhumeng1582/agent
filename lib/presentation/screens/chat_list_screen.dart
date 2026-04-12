@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
-import '../../core/constants/search_provider.dart';
+import '../../core/constants/font_size_provider.dart';
 import '../providers/chat_provider.dart';
 import 'chat_room_screen.dart';
 import 'search_screen.dart';
@@ -26,18 +26,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final locale = ref.watch(localeProvider);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey[900] : AppColors.background,
+      backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(
         title: Text(
           _t('appTitle', locale),
           style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
+            color: isDarkMode ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: isDarkMode ? Colors.grey[850] : AppColors.surface,
-        elevation: 1,
+        backgroundColor: isDarkMode ? AppColors.surfaceDark : AppColors.surface,
+        elevation: 0,
         iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
+          color: isDarkMode ? Colors.white : AppColors.textPrimary,
         ),
         actions: [
           IconButton(
@@ -122,15 +123,15 @@ class _ChatListItem extends ConsumerWidget {
 
   const _ChatListItem({super.key, required this.chat, required this.isDarkMode, required this.locale});
 
-  static const List<Color> _avatarColors = [
+  static const List<Color> _avatarGradientColors = [
     AppColors.primary,
-    Color(0xFF6B5B95),
-    Color(0xFF88B04B),
-    Color(0xFFFF6F61),
-    Color(0xFFFFA500),
-    Color(0xFF00CED1),
-    Color(0xFF9370DB),
-    Color(0xFF20B2AA),
+    Color(0xFFFF6B9D),
+    Color(0xFF00D9A6),
+    Color(0xFFFF9F43),
+    Color(0xFF54A0FF),
+    Color(0xFF5F27CD),
+    Color(0xFFFF6B6B),
+    Color(0xFF00CEC9),
   ];
 
   static const List<IconData> _avatarIcons = [
@@ -145,8 +146,7 @@ class _ChatListItem extends ConsumerWidget {
   ];
 
   int get _avatarIndex {
-    // Use hashCode of chat.id for consistent avatar per chat
-    return chat.id.hashCode.abs() % _avatarColors.length;
+    return chat.id.hashCode.abs() % _avatarGradientColors.length;
   }
 
   String _t(String key) {
@@ -166,6 +166,9 @@ class _ChatListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final loadingChatIds = ref.watch(loadingChatIdsProvider);
+    final isLoading = loadingChatIds.contains(chat.id);
+    final fontSize = ref.watch(fontSizeProvider);
     final timeFormat = DateFormat('HH:mm');
     final dateFormat = DateFormat('MM/dd');
 
@@ -179,99 +182,173 @@ class _ChatListItem extends ConsumerWidget {
       return dateFormat.format(time);
     }
 
-    return Slidable(
-      key: Key(chat.id),
-      endActionPane: ActionPane(
-        motion: const BehindMotion(),
-        extentRatio: 0.5,
-        children: [
-          SlidableAction(
-            onPressed: (context) {
-              ref.read(chatsProvider.notifier).togglePinChat(chat.id);
-            },
-            backgroundColor: chat.isPinned ? Colors.grey : AppColors.primary,
-            foregroundColor: Colors.white,
-            icon: chat.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-            label: chat.isPinned ? _t('unpin') : _t('pin'),
-          ),
-          SlidableAction(
-            onPressed: (context) async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(_t('deleteChat')),
-                  content: Text(_t('deleteChatConfirm')),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: Text(_t('cancel')),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: Text(_t('delete')),
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: isDarkMode ? 0 : 12,
+        vertical: 4,
+      ),
+      child: Slidable(
+        key: Key(chat.id),
+        endActionPane: ActionPane(
+          motion: const BehindMotion(),
+          extentRatio: 0.4,
+          children: [
+            SlidableAction(
+              onPressed: (context) {
+                ref.read(chatsProvider.notifier).togglePinChat(chat.id);
+              },
+              backgroundColor: chat.isPinned
+                  ? (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!)
+                  : AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: chat.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+              label: chat.isPinned ? _t('unpin') : _t('pin'),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            const SizedBox(width: 4),
+            SlidableAction(
+              onPressed: (context) async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(_t('deleteChat')),
+                    content: Text(_t('deleteChatConfirm')),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(_t('cancel')),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text(_t('delete')),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  ref.read(chatsProvider.notifier).deleteChat(chat.id);
+                }
+              },
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              icon: Icons.delete,
+              label: _t('delete'),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ],
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDarkMode
+                ? const Color(0xFF252542)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: isDarkMode
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _avatarGradientColors[_avatarIndex],
+                    _avatarGradientColors[_avatarIndex].withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: _avatarGradientColors[_avatarIndex].withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(_avatarIcons[_avatarIndex], color: Colors.white, size: 26),
+            ),
+            title: Row(
+              children: [
+                if (chat.isPinned)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Icon(
+                      Icons.push_pin,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          chat.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15.0 * fontSize.scale,
+                          ),
+                        ),
+                      ),
+                      if (isLoading)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                chat.lastMessagePreview ?? _t('noMessages'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  fontSize: 13.0 * fontSize.scale,
+                ),
+              ),
+            ),
+            trailing: Text(
+              formatTime(chat.lastMessageTime),
+              style: TextStyle(
+                color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                fontSize: 12.0 * fontSize.scale,
+              ),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatRoomScreen(chatId: chat.id, chatName: chat.name),
                 ),
               );
-              if (confirm == true) {
-                ref.read(chatsProvider.notifier).deleteChat(chat.id);
-              }
             },
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            icon: Icons.delete,
-            label: _t('delete'),
           ),
-        ],
-      ),
-      child: Container(
-        color: isDarkMode ? Colors.grey[850] : Colors.white,
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: _avatarColors[_avatarIndex],
-            child: Icon(_avatarIcons[_avatarIndex], color: Colors.white),
-          ),
-          title: Row(
-            children: [
-              if (chat.isPinned)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(
-                    Icons.push_pin,
-                    size: 14,
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  chat.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          subtitle: Text(
-            chat.lastMessagePreview ?? _t('noMessages'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
-          ),
-          trailing: Text(
-            formatTime(chat.lastMessageTime),
-            style: TextStyle(color: isDarkMode ? Colors.grey[500] : Colors.grey[500], fontSize: 12),
-          ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatRoomScreen(chatId: chat.id, chatName: chat.name),
-              ),
-            );
-          },
         ),
       ),
     );

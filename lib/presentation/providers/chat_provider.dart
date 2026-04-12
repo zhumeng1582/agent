@@ -567,8 +567,9 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       state = [...state, reply];
       _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, replyContent);
 
-      // Mark streaming as complete after a delay to trigger typewriter animation
-      Future.delayed(const Duration(milliseconds: 100), () {
+      // Mark streaming as complete after animation finishes (30ms per char + 500ms buffer)
+      final animationDuration = Duration(milliseconds: replyContent.length * 30 + 500);
+      Future.delayed(animationDuration, () {
         final completedReply = reply.copyWith(isStreaming: false);
         _repository.saveMessage(completedReply);
         updateMessage(completedReply);

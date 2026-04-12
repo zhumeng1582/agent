@@ -355,6 +355,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        centerTitle: true,
         backgroundColor: isDarkMode ? AppColors.surfaceDark : AppColors.surface,
         elevation: 0,
         iconTheme: IconThemeData(

@@ -23,6 +23,7 @@ class TextMessage extends ConsumerWidget {
         : (isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary);
 
     final displayContent = _getDisplayContent();
+    final streaming = message.isStreaming ?? false;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -53,7 +54,7 @@ class TextMessage extends ConsumerWidget {
               ),
             ),
           ),
-          if (message.isStreaming) _buildCursor(textColor),
+          if (streaming) _buildCursor(textColor),
         ],
       ),
     );
@@ -61,11 +62,11 @@ class TextMessage extends ConsumerWidget {
 
   String _getDisplayContent() {
     final content = message.content ?? '';
-    if (!message.isStreaming || content.isEmpty) {
+    final streaming = message.isStreaming ?? false;
+    if (!streaming || content.isEmpty) {
       return content;
     }
     // Show partial content while streaming for visual effect
-    // This creates a typewriter-like visual without complex animation
     final length = content.length;
     final showLength = (length * 0.5).ceil().clamp(1, length);
     return content.substring(0, showLength);

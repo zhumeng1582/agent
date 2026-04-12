@@ -12,7 +12,7 @@ class Message {
   final String? replyToContent;
   final bool isFavorite;
   final String? translatedContent;
-  final bool isStreaming;
+  final bool? isStreaming;
 
   Message({
     required this.id,

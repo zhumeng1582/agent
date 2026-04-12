@@ -86,14 +86,14 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     // Add the message as AI message directly (no AI response needed)
     await ref.read(messagesProvider(_actualChatId).notifier).addAIMessage(content);
     // Request AI to generate title for the conversation
-    _generateChatTitle(content);
+    await _generateChatTitle(content);
   }
 
   Future<void> _generateChatTitle(String content) async {
     // Use AI to generate a title based on the message content
     final aiService = ref.read(aiServiceProvider);
     final title = await aiService.summarizeForTitle(content);
-    if (title.isNotEmpty && title != '新聊天') {
+    if (title.isNotEmpty) {
       await ref.read(chatsProvider.notifier).updateChatName(_actualChatId, title);
       setState(() {
         _chatTitle = title;

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +12,7 @@ import 'image_message.dart';
 import 'voice_message.dart';
 import 'video_message.dart';
 
-class MessageBubble extends ConsumerWidget {
+class MessageBubble extends ConsumerStatefulWidget {
   final Message message;
   final bool isDarkMode;
   final bool showDate;
@@ -21,6 +20,7 @@ class MessageBubble extends ConsumerWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onFavorite;
   final VoidCallback? onTranslate;
+  final Function(Message)? onFollowUp;
 
   const MessageBubble({
     super.key,
@@ -31,90 +31,195 @@ class MessageBubble extends ConsumerWidget {
     this.onDelete,
     this.onFavorite,
     this.onTranslate,
+    this.onFollowUp,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends ConsumerState<MessageBubble> {
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
+  bool _isMenuVisible = false;
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    _isMenuVisible = false;
+  }
+
+  void _showFloatingMenu(BuildContext context) {
+    if (_isMenuVisible) {
+      _removeOverlay();
+      return;
+    }
+
+    _removeOverlay();
+
+    final overlay = Overlay.of(context);
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => _FloatingMessageMenu(
+        message: widget.message,
+        isDarkMode: widget.isDarkMode,
+        layerLink: _layerLink,
+        onDismiss: _removeOverlay,
+        onReply: () {
+          _removeOverlay();
+          widget.onReply?.call();
+        },
+        onCopy: () {
+          Clipboard.setData(ClipboardData(text: widget.message.content ?? ''));
+          _removeOverlay();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('已复制到剪贴板'),
+              backgroundColor: widget.isDarkMode ? Colors.grey[700] : Colors.grey[800],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        },
+        onFavorite: () {
+          _removeOverlay();
+          widget.onFavorite?.call();
+        },
+        onTranslate: () {
+          _removeOverlay();
+          widget.onTranslate?.call();
+        },
+        onDelete: () {
+          _removeOverlay();
+          _confirmDelete(context);
+        },
+        onFollowUp: () {
+          _removeOverlay();
+          widget.onFollowUp?.call(widget.message);
+        },
+      ),
+    );
+
+    _isMenuVisible = true;
+    overlay.insert(_overlayEntry!);
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除消息'),
+        content: const Text('确定要删除这条消息吗？'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onDelete?.call();
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final timeFormat = DateFormat('HH:mm');
-    final isFromMe = message.isFromMe;
+    final isFromMe = widget.message.isFromMe;
     final fontSize = ref.watch(fontSizeProvider);
 
     return Column(
       children: [
         // Date separator
-        if (showDate)
+        if (widget.showDate)
           Container(
             margin: const EdgeInsets.symmetric(vertical: 16),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: isDarkMode
+              color: widget.isDarkMode
                   ? AppColors.surfaceDark.withValues(alpha: 0.8)
                   : AppColors.background,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              _formatDate(message.timestamp),
+              _formatDate(widget.message.timestamp),
               style: TextStyle(
                 fontSize: 12.0 * fontSize.scale,
-                color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
         // Message bubble
-        GestureDetector(
-          onLongPress: () => _showMessageMenu(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment:
-                  isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                // Reply quote
-                if (message.replyToContent != null) _buildReplyQuote(fontSize),
-                // Message content with bubble
-                _buildBubble(context, isFromMe),
-                const SizedBox(height: 4),
-                // Timestamp, status, TTS button and favorite
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      timeFormat.format(message.timestamp),
-                      style: TextStyle(
-                        fontSize: 11.0 * fontSize.scale,
-                        color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ),
-                    ),
-                    if (isFromMe) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.done_all,
-                        size: 14,
-                        color: AppColors.primary.withValues(alpha: 0.7),
-                      ),
-                    ],
-                    if (!isFromMe && message.type == MessageType.text) ...[
-                      const SizedBox(width: 8),
-                      _buildTTSButton(context, ref),
-                    ],
-                    if (message.isFavorite) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: onFavorite,
-                        child: Icon(
-                          Icons.star,
-                          size: 14,
-                          color: Colors.amber,
+        CompositedTransformTarget(
+          link: _layerLink,
+          child: GestureDetector(
+            onLongPress: () => _showFloatingMenu(context),
+            onSecondaryTap: () => _showFloatingMenu(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment:
+                    isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  // Reply quote
+                  if (widget.message.replyToContent != null) _buildReplyQuote(fontSize),
+                  // Message content with bubble
+                  _buildBubble(context, isFromMe),
+                  const SizedBox(height: 4),
+                  // Timestamp, status, TTS button and favorite
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        timeFormat.format(widget.message.timestamp),
+                        style: TextStyle(
+                          fontSize: 11.0 * fontSize.scale,
+                          color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                         ),
                       ),
+                      if (isFromMe) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.done_all,
+                          size: 14,
+                          color: AppColors.primary.withValues(alpha: 0.7),
+                        ),
+                      ],
+                      if (!isFromMe && widget.message.type == MessageType.text) ...[
+                        const SizedBox(width: 8),
+                        _buildTTSButton(context, ref),
+                      ],
+                      if (widget.message.isFavorite) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: widget.onFavorite,
+                          child: const Icon(
+                            Icons.star,
+                            size: 14,
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                // Translation display
-                _buildTranslationDisplay(ref),
-              ],
+                  ),
+                  // Translation display
+                  _buildTranslationDisplay(ref),
+                ],
+              ),
             ),
           ),
         ),
@@ -135,7 +240,7 @@ class MessageBubble extends ConsumerWidget {
                 end: Alignment.bottomRight,
               )
             : null,
-        color: isFromMe ? null : (isDarkMode ? AppColors.receivedBubbleDark : AppColors.receivedBubble),
+        color: isFromMe ? null : (widget.isDarkMode ? AppColors.receivedBubbleDark : AppColors.receivedBubble),
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(18),
           topRight: const Radius.circular(18),
@@ -155,7 +260,7 @@ class MessageBubble extends ConsumerWidget {
   }
 
   Widget _buildTranslationDisplay(WidgetRef ref) {
-    final isLoading = ref.watch(translationLoadingProvider).contains(message.id);
+    final isLoading = ref.watch(translationLoadingProvider).contains(widget.message.id);
     final fontSize = ref.watch(fontSizeProvider);
 
     if (isLoading) {
@@ -163,7 +268,7 @@ class MessageBubble extends ConsumerWidget {
         margin: const EdgeInsets.only(top: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isDarkMode
+          color: widget.isDarkMode
               ? AppColors.surfaceDark.withValues(alpha: 0.6)
               : Colors.grey[100],
           borderRadius: BorderRadius.circular(10),
@@ -184,7 +289,7 @@ class MessageBubble extends ConsumerWidget {
               '翻译中...',
               style: TextStyle(
                 fontSize: 12.0 * fontSize.scale,
-                color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -193,25 +298,25 @@ class MessageBubble extends ConsumerWidget {
       );
     }
 
-    if (message.translatedContent != null && message.translatedContent!.isNotEmpty) {
+    if (widget.message.translatedContent != null && widget.message.translatedContent!.isNotEmpty) {
       return GestureDetector(
         onLongPress: () {
-          onTranslate?.call();
+          widget.onTranslate?.call();
         },
         child: Container(
           margin: const EdgeInsets.only(top: 6),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isDarkMode
+            color: widget.isDarkMode
                 ? AppColors.surfaceDark.withValues(alpha: 0.6)
                 : Colors.grey[100],
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
-            message.translatedContent!,
+            widget.message.translatedContent!,
             style: TextStyle(
               fontSize: 13.0 * fontSize.scale,
-              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+              color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -227,7 +332,7 @@ class MessageBubble extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDarkMode
+        color: widget.isDarkMode
             ? AppColors.surfaceDark.withValues(alpha: 0.5)
             : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
@@ -240,10 +345,10 @@ class MessageBubble extends ConsumerWidget {
       ),
       constraints: const BoxConstraints(maxWidth: 280),
       child: Text(
-        message.replyPreview,
+        widget.message.replyPreview,
         style: TextStyle(
           fontSize: 13.0 * fontSize.scale,
-          color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
         ),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
@@ -251,174 +356,51 @@ class MessageBubble extends ConsumerWidget {
     );
   }
 
-  void _showMessageMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            if (message.type == MessageType.text)
-              _buildMenuItem(
-                icon: Icons.copy_rounded,
-                title: '复制',
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: message.content ?? ''));
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('已复制到剪贴板'),
-                      backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[800],
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                },
-              ),
-            if (message.type == MessageType.image)
-              _buildMenuItem(
-                icon: Icons.copy_rounded,
-                title: '复制图片',
-                onTap: () => _copyImage(context),
-              ),
-            _buildMenuItem(
-              icon: Icons.reply_rounded,
-              title: '引用回复',
-              onTap: () {
-                Navigator.pop(context);
-                onReply?.call();
-              },
-            ),
-            _buildMenuItem(
-              icon: message.isFavorite ? Icons.star : Icons.star_border,
-              title: message.isFavorite ? '取消收藏' : '收藏',
-              onTap: () {
-                Navigator.pop(context);
-                onFavorite?.call();
-              },
-            ),
-            if (message.type == MessageType.text)
-              _buildMenuItem(
-                icon: Icons.translate,
-                title: '翻译',
-                onTap: () {
-                  Navigator.pop(context);
-                  onTranslate?.call();
-                },
-              ),
-            _buildMenuItem(
-              icon: Icons.delete_outline_rounded,
-              title: '删除',
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(context);
-              },
-              isDestructive: true,
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildTTSButton(BuildContext context, WidgetRef ref) {
+    final ttsState = ref.watch(ttsProvider);
+    final isPlaying = ttsState.isPlaying && ttsState.playingMessageId == widget.message.id;
+    final hasError = ttsState.error != null && ttsState.playingMessageId == widget.message.id;
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    bool isDestructive = false,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isDestructive
-            ? Colors.red
-            : (isDarkMode ? Colors.white : Colors.black),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isDestructive
-              ? Colors.red
-              : (isDarkMode ? Colors.white : Colors.black),
-        ),
-      ),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-    );
-  }
-
-  Future<void> _copyImage(BuildContext context) async {
-    if (message.mediaPath == null) return;
-
-    try {
-      final file = File(message.mediaPath!);
-      if (!await file.exists()) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('图片文件不存在')),
-          );
+    return GestureDetector(
+      onTap: () async {
+        if (isPlaying) {
+          ref.read(ttsProvider.notifier).stop();
+        } else {
+          final result = await ref.read(ttsProvider.notifier).speak(widget.message.id, widget.message.content ?? '');
+          if (result != '播放中' && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result),
+                duration: const Duration(seconds: 2),
+                backgroundColor: widget.isDarkMode ? Colors.grey[700] : Colors.grey[800],
+              ),
+            );
+          }
         }
-        return;
-      }
-
-      await Clipboard.setData(ClipboardData(text: message.mediaPath!));
-
-      if (context.mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('图片路径已复制到剪贴板'),
-            backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[800],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('复制失败: $e')),
-        );
-      }
-    }
-  }
-
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除消息'),
-        content: const Text('确定要删除这条消息吗？'),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              onDelete?.call();
-            },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
+      },
+      child: Icon(
+        isPlaying ? Icons.stop_circle : (hasError ? Icons.error_outline : Icons.volume_up),
+        size: 16,
+        color: isPlaying
+            ? AppColors.primary
+            : (hasError
+                ? Colors.red
+                : (widget.isDarkMode ? Colors.grey[500] : Colors.grey[400])),
       ),
     );
+  }
+
+  Widget _buildMessageContent() {
+    switch (widget.message.type) {
+      case MessageType.text:
+        return TextMessage(message: widget.message, isDarkMode: widget.isDarkMode);
+      case MessageType.image:
+        return ImageMessage(message: widget.message);
+      case MessageType.voice:
+        return VoiceMessage(message: widget.message, isDarkMode: widget.isDarkMode);
+      case MessageType.video:
+        return VideoMessage(message: widget.message);
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -435,51 +417,151 @@ class MessageBubble extends ConsumerWidget {
       return DateFormat('MM月dd日').format(date);
     }
   }
+}
 
-  Widget _buildTTSButton(BuildContext context, WidgetRef ref) {
-    final ttsState = ref.watch(ttsProvider);
-    final isPlaying = ttsState.isPlaying && ttsState.playingMessageId == message.id;
-    final hasError = ttsState.error != null && ttsState.playingMessageId == message.id;
+class _FloatingMessageMenu extends StatelessWidget {
+  final Message message;
+  final bool isDarkMode;
+  final LayerLink layerLink;
+  final VoidCallback onDismiss;
+  final VoidCallback onReply;
+  final VoidCallback onCopy;
+  final VoidCallback onFavorite;
+  final VoidCallback onTranslate;
+  final VoidCallback onDelete;
+  final VoidCallback onFollowUp;
 
-    return GestureDetector(
-      onTap: () async {
-        if (isPlaying) {
-          ref.read(ttsProvider.notifier).stop();
-        } else {
-          final result = await ref.read(ttsProvider.notifier).speak(message.id, message.content ?? '');
-          if (result != '播放中' && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result),
-                duration: const Duration(seconds: 2),
-                backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[800],
+  const _FloatingMessageMenu({
+    required this.message,
+    required this.isDarkMode,
+    required this.layerLink,
+    required this.onDismiss,
+    required this.onReply,
+    required this.onCopy,
+    required this.onFavorite,
+    required this.onTranslate,
+    required this.onDelete,
+    required this.onFollowUp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Dismiss overlay
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onDismiss,
+            onSecondaryTap: onDismiss,
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        // Menu
+        Positioned(
+          width: 200,
+          child: CompositedTransformFollower(
+            link: layerLink,
+            targetAnchor: Alignment.bottomRight,
+            followerAnchor: Alignment.topRight,
+            offset: const Offset(0, -8),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(16),
+              color: isDarkMode ? AppColors.surfaceDark : Colors.white,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (message.type == MessageType.text) ...[
+                      _buildMenuItem(
+                        icon: Icons.text_fields,
+                        title: '选取文字',
+                        onTap: onDismiss,
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.copy_rounded,
+                        title: '复制',
+                        onTap: onCopy,
+                      ),
+                    ],
+                    if (message.type == MessageType.image)
+                      _buildMenuItem(
+                        icon: Icons.copy_rounded,
+                        title: '复制图片',
+                        onTap: onCopy,
+                      ),
+                    _buildMenuItem(
+                      icon: Icons.reply_rounded,
+                      title: '引用回复',
+                      onTap: onReply,
+                    ),
+                    if (message.type == MessageType.text)
+                      _buildMenuItem(
+                        icon: Icons.send_rounded,
+                        title: '追问',
+                        onTap: onFollowUp,
+                      ),
+                    _buildMenuItem(
+                      icon: message.isFavorite ? Icons.star : Icons.star_border,
+                      title: message.isFavorite ? '取消收藏' : '收藏',
+                      onTap: onFavorite,
+                    ),
+                    if (message.type == MessageType.text)
+                      _buildMenuItem(
+                        icon: Icons.translate,
+                        title: '翻译',
+                        onTap: onTranslate,
+                      ),
+                    _buildMenuItem(
+                      icon: Icons.delete_outline_rounded,
+                      title: '删除',
+                      onTap: onDelete,
+                      isDestructive: true,
+                    ),
+                  ],
+                ),
               ),
-            );
-          }
-        }
-      },
-      child: Icon(
-        isPlaying ? Icons.stop_circle : (hasError ? Icons.error_outline : Icons.volume_up),
-        size: 16,
-        color: isPlaying
-            ? AppColors.primary
-            : (hasError
-                ? Colors.red
-                : (isDarkMode ? Colors.grey[500] : Colors.grey[400])),
-      ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildMessageContent() {
-    switch (message.type) {
-      case MessageType.text:
-        return TextMessage(message: message, isDarkMode: isDarkMode);
-      case MessageType.image:
-        return ImageMessage(message: message);
-      case MessageType.voice:
-        return VoiceMessage(message: message, isDarkMode: isDarkMode);
-      case MessageType.video:
-        return VideoMessage(message: message);
-    }
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isDestructive
+                  ? Colors.red
+                  : (isDarkMode ? Colors.white : AppColors.textPrimary),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: isDestructive
+                    ? Colors.red
+                    : (isDarkMode ? Colors.white : AppColors.textPrimary),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

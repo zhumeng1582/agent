@@ -259,6 +259,66 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     );
   }
 
+  Widget _buildSuggestedTopics() {
+    final suggestedTopics = ref.watch(suggestedTopicsProvider(_actualChatId));
+    if (suggestedTopics.isEmpty) return const SizedBox.shrink();
+
+    final isDarkMode = ref.watch(themeProvider) == ThemeMode.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '相关话题',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: suggestedTopics.map((topic) {
+              return GestureDetector(
+                onTap: () => _onSuggestedTopicTap(topic),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    topic,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onSuggestedTopicTap(String topic) async {
+    // Clear suggestions
+    ref.read(suggestedTopicsProvider(_actualChatId).notifier).state = [];
+    // Send as user message
+    await ref.read(messagesProvider(_actualChatId).notifier).sendTextMessage(topic);
+    // Scroll to bottom
+    _scrollToBottom();
+  }
+
   Widget _buildReplyBanner() {
     final themeMode = ref.watch(themeProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
@@ -467,6 +527,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             ),
             if (_replyToMessage != null) _buildReplyBanner(),
             _buildLoadingIndicator(isDarkMode, locale),
+            _buildSuggestedTopics(),
             InputBar(
               chatId: _actualChatId,
               isTempChat: widget.isTempChat,

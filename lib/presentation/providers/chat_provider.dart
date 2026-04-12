@@ -149,10 +149,14 @@ final messagesProvider = StateNotifierProvider.family<MessagesNotifier, List<Mes
 // 正在等待AI回复的会话ID集合，可以同时多个会话在loading
 final loadingChatIdsProvider = StateProvider<Set<String>>((ref) => {});
 
+// 建议追问话题Provider
+final suggestedTopicsProvider = StateProvider.family<List<String>, String>((ref, chatId) => []);
+
 class MessagesNotifier extends StateNotifier<List<Message>> {
   final Ref _ref;
   final String _chatId;
   final _uuid = const Uuid();
+  int _consecutiveUserMessages = 0;
 
   MessagesNotifier(this._ref, this._chatId) : super([]) {
     _loadMessages();
@@ -235,6 +239,36 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       }
     } else {
       _addLimitExceededMessage();
+    }
+
+    // Track consecutive user messages and generate suggestions after 3+
+    _consecutiveUserMessages++;
+    if (_consecutiveUserMessages >= 3) {
+      _generateFollowUpSuggestions(content);
+    }
+  }
+
+  void _resetConsecutiveCount() {
+    _consecutiveUserMessages = 0;
+    _ref.read(suggestedTopicsProvider(_chatId).notifier).state = [];
+  }
+
+  Future<void> _generateFollowUpSuggestions(String latestMessage) async {
+    // Build conversation context from last few messages
+    final recentMessages = state.reversed.take(10).toList();
+    final contextBuilder = StringBuffer();
+    for (final msg in recentMessages.reversed) {
+      final role = msg.isFromMe ? '用户' : '助手';
+      contextBuilder.writeln('$role: ${msg.content ?? ''}');
+    }
+
+    final topics = await _aiService.generateFollowUpTopics(
+      latestMessage,
+      contextBuilder.toString(),
+    );
+
+    if (topics.isNotEmpty) {
+      _ref.read(suggestedTopicsProvider(_chatId).notifier).state = topics;
     }
   }
 
@@ -613,6 +647,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       state = [...state, errorReply];
     } finally {
       _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
+      _resetConsecutiveCount();
     }
   }
 

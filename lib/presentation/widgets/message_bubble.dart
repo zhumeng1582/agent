@@ -65,7 +65,7 @@ class MessageBubble extends ConsumerWidget {
         GestureDetector(
           onLongPress: () => _showMessageMenu(context),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
             width: double.infinity,
             child: Column(
               crossAxisAlignment:

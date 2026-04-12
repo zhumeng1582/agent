@@ -90,7 +90,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
 
-    final menuSize = const Size(200, 300); // Approximate menu size
+    final menuWidth = 200.0;
     final screenSize = MediaQuery.of(context).size;
     final tapGlobalPosition = renderBox.localToGlobal(tapPosition);
 
@@ -99,21 +99,19 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     bool alignLeft = false;
     // If tap is in right half, align menu to left of tap point
     if (tapPosition.dx > renderBox.size.width / 2) {
-      left = tapGlobalPosition.dx - menuSize.width + 16;
+      left = tapGlobalPosition.dx - menuWidth + 16;
       alignLeft = true;
     }
     // Ensure menu stays within screen bounds
     if (left < 8) left = 8;
-    if (left + menuSize.width > screenSize.width - 8) {
-      left = screenSize.width - menuSize.width - 8;
+    if (left + menuWidth > screenSize.width - 8) {
+      left = screenSize.width - menuWidth - 8;
     }
 
-    // Determine vertical position
-    double top = tapGlobalPosition.dy;
+    // Determine vertical position - check if need to show above
     bool showMenuAbove = false;
-    // If not enough space below, show above
-    if (tapGlobalPosition.dy + menuSize.height > screenSize.height - 100) {
-      top = tapGlobalPosition.dy - menuSize.height;
+    // If not enough space below (screen height - 100px margin), show above
+    if (tapGlobalPosition.dy + 300 > screenSize.height - 100) {
       showMenuAbove = true;
     }
 
@@ -123,7 +121,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
       builder: (context) => _FloatingMessageMenu(
         message: widget.message,
         isDarkMode: widget.isDarkMode,
-        menuPosition: Offset(left, top),
+        menuPosition: Offset(left, tapGlobalPosition.dy),
         showMenuAbove: showMenuAbove,
         alignLeft: alignLeft,
         onDismiss: _removeOverlay,
@@ -615,8 +613,9 @@ class _FloatingMessageMenu extends StatelessWidget {
         // Menu - positioned at the calculated tap position
         Positioned(
           left: menuPosition.dx,
-          top: showMenuAbove ? null : menuPosition.dy + 8,
-          bottom: showMenuAbove ? MediaQuery.of(context).size.height - menuPosition.dy + 8 : null,
+          top: showMenuAbove
+              ? (menuPosition.dy > 300 ? menuPosition.dy - 300 : 8)
+              : menuPosition.dy + 8,
           child: Material(
             elevation: 8,
             borderRadius: BorderRadius.circular(16),

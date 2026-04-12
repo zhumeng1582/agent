@@ -71,11 +71,6 @@ class SettingsScreen extends ConsumerWidget {
                 isDarkMode: isDarkMode,
               ),
               _buildInfoTile(
-                title: _getLocalizedText('modelVersion', currentLocale),
-                value: 'MiniMax-M2.7',
-                isDarkMode: isDarkMode,
-              ),
-              _buildInfoTile(
                 title: _getLocalizedText('developer', currentLocale),
                 value: 'Claude Code',
                 isDarkMode: isDarkMode,
@@ -650,7 +645,6 @@ class SettingsScreen extends ConsumerWidget {
       'selectTheme': {'en': 'Select Theme', 'zh': '选择主题', 'zh_TW': '選擇主題'},
       'about': {'en': 'About', 'zh': '关于', 'zh_TW': '關於'},
       'version': {'en': 'Version', 'zh': '版本', 'zh_TW': '版本'},
-      'modelVersion': {'en': 'Model Version', 'zh': '模型版本', 'zh_TW': '模型版本'},
       'developer': {'en': 'Developer', 'zh': '开发者', 'zh_TW': '開發者'},
       'poweredBy': {'en': 'Powered by MiniMax-M2.7', 'zh': '由MiniMax-M2.7提供技术支持', 'zh_TW': '由MiniMax-M2.7提供技術支持'},
       'language': {'en': 'Language', 'zh': '语言', 'zh_TW': '語言'},

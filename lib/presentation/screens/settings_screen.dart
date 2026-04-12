@@ -378,25 +378,34 @@ class SettingsScreen extends ConsumerWidget {
     final currentMode = ref.read(themeProvider);
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+      backgroundColor: isDarkMode ? AppColors.surfaceDark : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+      builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _getLocalizedText('selectTheme', currentLocale),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _getLocalizedText('selectTheme', currentLocale),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
             _buildThemeOption(
               context,
               ref,
@@ -424,6 +433,7 @@ class SettingsScreen extends ConsumerWidget {
               currentMode == ThemeMode.dark,
               isDarkMode,
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -522,25 +532,34 @@ class SettingsScreen extends ConsumerWidget {
   void _showFontSizeSelector(BuildContext context, WidgetRef ref, FontSizeState currentState, bool isDarkMode, Locale locale) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+      backgroundColor: isDarkMode ? AppColors.surfaceDark : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+      builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _getLocalizedText('selectFontSize', locale),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _getLocalizedText('selectFontSize', locale),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ),
             _buildFontSizeOption(
               context,
               ref,
@@ -568,6 +587,7 @@ class SettingsScreen extends ConsumerWidget {
               currentState.option == FontSizeOption.large,
               isDarkMode,
             ),
+            const SizedBox(height: 16),
           ],
         ),
       ),

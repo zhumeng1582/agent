@@ -507,7 +507,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       final messages = <Map<String, String>>[];
 
       // Add previous messages as history (up to last 20 to avoid token limits)
-      final historyMessages = state.take(20);
+      final historyMessages = state.reversed.take(20);
       for (final msg in historyMessages) {
         if (msg.type == MessageType.text && msg.content != null) {
           messages.add({

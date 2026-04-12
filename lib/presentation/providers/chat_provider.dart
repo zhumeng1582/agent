@@ -157,6 +157,8 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   final String _chatId;
   final _uuid = const Uuid();
   int _consecutiveUserMessages = 0;
+  bool _isLoading = false;
+  bool _isInitialized = false;
 
   MessagesNotifier(this._ref, this._chatId) : super([]) {
     _loadMessages();
@@ -166,8 +168,18 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   AIService get _aiService => _ref.read(aiServiceProvider);
 
   Future<void> _loadMessages() async {
+    if (_isLoading) return;
+    _isLoading = true;
     final messages = await _repository.getMessages(_chatId);
     state = messages;
+    _isInitialized = true;
+    _isLoading = false;
+  }
+
+  Future<void> ensureInitialized() async {
+    if (!_isInitialized) {
+      await _loadMessages();
+    }
   }
 
   Future<void> updateMessage(Message updatedMessage) async {
@@ -189,6 +201,9 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   Future<void> sendTextMessage(String content, {String? replyToId, String? replyToContent}) async {
+    // Ensure messages are loaded before processing
+    await ensureInitialized();
+
     // Check if this is the first user message
     final isFirstMessage = state.where((m) => m.isFromMe).isEmpty;
 
@@ -258,6 +273,8 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     // Check if suggestions already exist
     final existingTopics = _ref.read(suggestedTopicsProvider(_chatId));
     if (existingTopics.isNotEmpty) return;
+
+    await ensureInitialized();
 
     // Build conversation context from last few messages
     final recentMessages = state.reversed.take(10).toList();
@@ -551,6 +568,8 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
 
   Future<void> _addAIReply(Message originalMessage) async {
     _ref.read(loadingChatIdsProvider.notifier).state = {..._ref.read(loadingChatIdsProvider), _chatId};
+
+    await ensureInitialized();
 
     try {
       String replyContent;

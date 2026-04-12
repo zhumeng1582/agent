@@ -340,7 +340,7 @@ class SettingsScreen extends ConsumerWidget {
         break;
       case ThemeMode.system:
         themeText = _getLocalizedText('systemMode', currentLocale);
-        themeIcon = Icons.settings_suggest;
+        themeIcon = Icons.brightness_auto;
         break;
     }
 
@@ -412,7 +412,7 @@ class SettingsScreen extends ConsumerWidget {
               context,
               ref,
               ThemeMode.system,
-              Icons.settings_suggest,
+              Icons.brightness_auto,
               _getLocalizedText('systemMode', currentLocale),
               currentMode == ThemeMode.system,
               isDarkMode,

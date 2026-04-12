@@ -12,8 +12,8 @@ class TranslationService {
   Future<String> translate(String text, {String targetLang = '中文'}) async {
     try {
       final prompt = 'Translate the following text to $targetLang. Only output the translation, nothing else.\n\nText: $text';
-      final result = await _service.chat(prompt);
-      return result.trim();
+      final result = await _service.chat([{'role': 'user', 'content': prompt}]);
+      return result.content.trim();
     } catch (e) {
       return 'Translation failed: $e';
     }

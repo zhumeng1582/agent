@@ -9,11 +9,15 @@ import '../../data/models/message.dart';
 class TextMessage extends ConsumerWidget {
   final Message message;
   final bool isDarkMode;
+  final bool selectionEnabled;
+  final Function(String)? onSelectionChanged;
 
   const TextMessage({
     super.key,
     required this.message,
     this.isDarkMode = false,
+    this.selectionEnabled = false,
+    this.onSelectionChanged,
   });
 
   @override
@@ -43,6 +47,30 @@ class TextMessage extends ConsumerWidget {
             ),
           ],
           isRepeatingAnimation: false,
+        ),
+      );
+    }
+
+    // When selection is enabled, show SelectableText instead of Markdown
+    if (selectionEnabled) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: SelectableText(
+          content,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 16 * fontSize.scale,
+            height: 1.4,
+          ),
+          onSelectionChanged: (selection, cause) {
+            if (selection.baseOffset != selection.extentOffset) {
+              final selectedText = content.substring(
+                selection.baseOffset.clamp(0, content.length),
+                selection.extentOffset.clamp(0, content.length),
+              );
+              onSelectionChanged?.call(selectedText);
+            }
+          },
         ),
       );
     }

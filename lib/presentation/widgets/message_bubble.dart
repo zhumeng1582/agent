@@ -42,6 +42,8 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
   bool _isMenuVisible = false;
+  bool _isSelectionMode = false;
+  String? _selectedText;
 
   @override
   void dispose() {
@@ -53,6 +55,28 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     _overlayEntry?.remove();
     _overlayEntry = null;
     _isMenuVisible = false;
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedText = null;
+    });
+  }
+
+  void _copySelectedText() {
+    if (_selectedText != null && _selectedText!.isNotEmpty) {
+      Clipboard.setData(ClipboardData(text: _selectedText!));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('已复制到剪贴板'),
+          backgroundColor: widget.isDarkMode ? Colors.grey[700] : Colors.grey[800],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+    _exitSelectionMode();
   }
 
   void _showFloatingMenu(BuildContext context) {
@@ -102,6 +126,12 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         onFollowUp: () {
           _removeOverlay();
           widget.onFollowUp?.call(widget.message);
+        },
+        onSelectText: () {
+          _removeOverlay();
+          setState(() {
+            _isSelectionMode = true;
+          });
         },
       ),
     );
@@ -218,12 +248,94 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                   ),
                   // Translation display
                   _buildTranslationDisplay(ref),
+                  // Selection mode floating toolbar
+                  if (_isSelectionMode && _selectedText != null && _selectedText!.isNotEmpty)
+                    _buildSelectionToolbar(fontSize),
+                  // Exit selection mode hint
+                  if (_isSelectionMode)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: GestureDetector(
+                        onTap: _exitSelectionMode,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: widget.isDarkMode
+                                ? AppColors.surfaceDark.withValues(alpha: 0.9)
+                                : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            '点击任意处退出选取',
+                            style: TextStyle(
+                              fontSize: 12 * fontSize.scale,
+                              color: widget.isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSelectionToolbar(FontSizeState fontSize) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: widget.isDarkMode ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '已选择 ${_selectedText!.length} 字符',
+            style: TextStyle(
+              fontSize: 13 * fontSize.scale,
+              color: widget.isDarkMode ? AppColors.textPrimaryDark : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: _copySelectedText,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '复制',
+                style: TextStyle(
+                  fontSize: 13 * fontSize.scale,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -393,7 +505,16 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
   Widget _buildMessageContent() {
     switch (widget.message.type) {
       case MessageType.text:
-        return TextMessage(message: widget.message, isDarkMode: widget.isDarkMode);
+        return TextMessage(
+          message: widget.message,
+          isDarkMode: widget.isDarkMode,
+          selectionEnabled: _isSelectionMode,
+          onSelectionChanged: (text) {
+            setState(() {
+              _selectedText = text;
+            });
+          },
+        );
       case MessageType.image:
         return ImageMessage(message: widget.message);
       case MessageType.voice:
@@ -430,6 +551,7 @@ class _FloatingMessageMenu extends StatelessWidget {
   final VoidCallback onTranslate;
   final VoidCallback onDelete;
   final VoidCallback onFollowUp;
+  final VoidCallback onSelectText;
 
   const _FloatingMessageMenu({
     required this.message,
@@ -442,6 +564,7 @@ class _FloatingMessageMenu extends StatelessWidget {
     required this.onTranslate,
     required this.onDelete,
     required this.onFollowUp,
+    required this.onSelectText,
   });
 
   @override
@@ -477,7 +600,7 @@ class _FloatingMessageMenu extends StatelessWidget {
                       _buildMenuItem(
                         icon: Icons.text_fields,
                         title: '选取文字',
-                        onTap: onDismiss,
+                        onTap: onSelectText,
                       ),
                       _buildMenuItem(
                         icon: Icons.copy_rounded,

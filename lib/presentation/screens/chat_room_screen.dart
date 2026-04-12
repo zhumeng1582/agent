@@ -12,6 +12,7 @@ import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/input_bar.dart';
 import 'chat_settings_screen.dart';
+import 'favorites_screen.dart';
 import 'search_screen.dart';
 
 class ChatRoomScreen extends ConsumerStatefulWidget {
@@ -100,6 +101,8 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     // Update the message in state directly without full refresh
     final updatedMessage = message.copyWith(isFavorite: newFavorite);
     ref.read(messagesProvider(_actualChatId).notifier).updateMessage(updatedMessage);
+    // Invalidate favorites list so it refreshes
+    ref.invalidate(favoriteMessagesProvider);
   }
 
   Future<void> _translateMessage(Message message) async {

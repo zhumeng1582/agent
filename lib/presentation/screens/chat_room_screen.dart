@@ -21,6 +21,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
   final bool isTempChat;
   final String? highlightMessageId;
   final String? initialMessage;  // For follow-up feature
+  final bool initialMessageFromAI;  // If true, it's an AI message (no AI response needed)
 
   const ChatRoomScreen({
     super.key,
@@ -29,6 +30,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
     this.isTempChat = false,
     this.highlightMessageId,
     this.initialMessage,
+    this.initialMessageFromAI = false,
   });
 
   @override
@@ -58,18 +60,45 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       _initialized = true;
       // Auto-send initial message for follow-up feature
       if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
-        _sendInitialMessage(widget.initialMessage!);
+        if (widget.initialMessageFromAI) {
+          _addInitialAIMessage(widget.initialMessage!);
+        } else {
+          _sendInitialUserMessage(widget.initialMessage!);
+        }
       }
     });
   }
 
-  Future<void> _sendInitialMessage(String content) async {
+  Future<void> _sendInitialUserMessage(String content) async {
     // Create the chat first if it's a temp chat
     if (widget.isTempChat) {
       await ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
     }
-    // Send the message
+    // Send the message as user message and request AI response
     await ref.read(messagesProvider(_actualChatId).notifier).sendTextMessage(content);
+  }
+
+  Future<void> _addInitialAIMessage(String content) async {
+    // Create the chat first if it's a temp chat
+    if (widget.isTempChat) {
+      await ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
+    }
+    // Add the message as AI message directly (no AI response needed)
+    await ref.read(messagesProvider(_actualChatId).notifier).addAIMessage(content);
+    // Request AI to generate title for the conversation
+    _generateChatTitle(content);
+  }
+
+  Future<void> _generateChatTitle(String content) async {
+    // Use AI to generate a title based on the message content
+    final aiService = ref.read(aiServiceProvider);
+    final title = await aiService.summarizeForTitle(content);
+    if (title.isNotEmpty && title != '新聊天') {
+      await ref.read(chatsProvider.notifier).updateChatName(_actualChatId, title);
+      setState(() {
+        _chatTitle = title;
+      });
+    }
   }
 
   @override
@@ -185,9 +214,10 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       MaterialPageRoute(
         builder: (context) => ChatRoomScreen(
           chatId: tempId,
-          chatName: '追问',
+          chatName: '创建新对话',
           isTempChat: true,
           initialMessage: message.content ?? '',
+          initialMessageFromAI: !message.isFromMe,
         ),
       ),
     );

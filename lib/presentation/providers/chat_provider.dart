@@ -171,6 +171,19 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     state = state.map((m) => m.id == updatedMessage.id ? updatedMessage : m).toList();
   }
 
+  Future<void> addAIMessage(String content) async {
+    final message = Message(
+      id: _uuid.v4(),
+      chatId: _chatId,
+      type: MessageType.text,
+      content: content,
+      timestamp: DateTime.now(),
+      isFromMe: false,
+    );
+    await _repository.saveMessage(message);
+    state = [...state, message];
+  }
+
   Future<void> sendTextMessage(String content, {String? replyToId, String? replyToContent}) async {
     // Check if this is the first user message
     final isFirstMessage = state.where((m) => m.isFromMe).isEmpty;

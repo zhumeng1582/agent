@@ -621,8 +621,8 @@ class _FloatingMessageMenu extends StatelessWidget {
                     ),
                     if (message.type == MessageType.text)
                       _buildMenuItem(
-                        icon: Icons.send_rounded,
-                        title: '追问',
+                        icon: Icons.add_circle_outline,
+                        title: '创建新对话',
                         onTap: onFollowUp,
                       ),
                     _buildMenuItem(

@@ -204,15 +204,21 @@ class SettingsScreen extends ConsumerWidget {
           color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),
-      subtitle: Text(
-        _getLanguageName(currentLocale),
-        style: TextStyle(
-          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        ),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _getLanguageName(currentLocale),
+            style: TextStyle(
+              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right,
+            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+          ),
+        ],
       ),
       onTap: () => _showLanguageDialog(context, ref, currentLocale),
     );

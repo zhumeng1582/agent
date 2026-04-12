@@ -26,50 +26,47 @@ class TextMessage extends ConsumerWidget {
     final content = message.content ?? '';
     final isStreaming = message.isStreaming ?? false;
 
+    if (isStreaming) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: AnimatedTextKit(
+          animatedTexts: [
+            TypewriterAnimatedText(
+              content,
+              textStyle: TextStyle(
+                color: textColor,
+                fontSize: 16 * fontSize.scale,
+                height: 1.4,
+              ),
+              speed: const Duration(milliseconds: 30),
+            ),
+          ],
+          isRepeatingAnimation: false,
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: isStreaming
-          ? _buildTypewriterText(content, textColor, fontSize.scale)
-          : _buildStaticText(content, textColor, fontSize.scale),
-    );
-  }
-
-  Widget _buildTypewriterText(String content, Color textColor, double fontScale) {
-    return AnimatedTextKit(
-      animatedTexts: [
-        TypewriterAnimatedText(
-          content,
-          textStyle: TextStyle(
+      child: MarkdownBody(
+        data: content,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(
             color: textColor,
-            fontSize: 16 * fontScale,
+            fontSize: 16 * fontSize.scale,
             height: 1.4,
           ),
-          speed: const Duration(milliseconds: 30),
-        ),
-      ],
-      isRepeatingAnimation: false,
-    );
-  }
-
-  Widget _buildStaticText(String content, Color textColor, double fontScale) {
-    return MarkdownBody(
-      data: content,
-      styleSheet: MarkdownStyleSheet(
-        p: TextStyle(
-          color: textColor,
-          fontSize: 16 * fontScale,
-          height: 1.4,
-        ),
-        code: TextStyle(
-          color: textColor,
-          backgroundColor: message.isFromMe
-              ? Colors.white.withValues(alpha: 0.2)
-              : (isDarkMode ? Colors.grey[600] : Colors.grey[200]),
-          fontSize: 14 * fontScale,
-        ),
-        codeblockDecoration: BoxDecoration(
-          color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
+          code: TextStyle(
+            color: textColor,
+            backgroundColor: message.isFromMe
+                ? Colors.white.withValues(alpha: 0.2)
+                : (isDarkMode ? Colors.grey[600] : Colors.grey[200]),
+            fontSize: 14 * fontSize.scale,
+          ),
+          codeblockDecoration: BoxDecoration(
+            color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       ),
     );

@@ -383,7 +383,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                     )
                   : ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
                         final message = messages[index];

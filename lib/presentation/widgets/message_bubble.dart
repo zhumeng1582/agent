@@ -65,7 +65,7 @@ class MessageBubble extends ConsumerWidget {
         GestureDetector(
           onLongPress: () => _showMessageMenu(context),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             width: double.infinity,
             child: Column(
               crossAxisAlignment:
@@ -125,7 +125,7 @@ class MessageBubble extends ConsumerWidget {
   Widget _buildBubble(BuildContext context, bool isFromMe) {
     return Container(
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.85,
+        maxWidth: MediaQuery.of(context).size.width,
       ),
       decoration: BoxDecoration(
         gradient: isFromMe

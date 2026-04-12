@@ -79,7 +79,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     _exitSelectionMode();
   }
 
-  void _showFloatingMenu(BuildContext context) {
+  void _showFloatingMenu(BuildContext context, Offset tapPosition) {
     if (_isMenuVisible) {
       _removeOverlay();
       return;
@@ -90,11 +90,14 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     // Calculate if message is in lower half of screen
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
     bool showMenuAbove = true;
+    bool alignLeft = false;
     if (renderBox != null) {
       final messagePosition = renderBox.localToGlobal(Offset.zero);
       final screenHeight = MediaQuery.of(context).size.height;
       // If message is in lower 40% of screen, show menu above
       showMenuAbove = messagePosition.dy > screenHeight * 0.4;
+      // If tap is in left half of message, align menu to the left
+      alignLeft = tapPosition.dx < renderBox.size.width / 2;
     }
 
     final overlay = Overlay.of(context);
@@ -105,6 +108,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         isDarkMode: widget.isDarkMode,
         layerLink: _layerLink,
         showMenuAbove: showMenuAbove,
+        alignLeft: alignLeft,
         onDismiss: _removeOverlay,
         onReply: () {
           _removeOverlay();
@@ -207,8 +211,8 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         CompositedTransformTarget(
           link: _layerLink,
           child: GestureDetector(
-            onLongPress: () => _showFloatingMenu(context),
-            onSecondaryTap: () => _showFloatingMenu(context),
+            onLongPressDown: (details) => _showFloatingMenu(context, details.localPosition),
+            onSecondaryTapDown: (details) => _showFloatingMenu(context, details.localPosition),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               width: double.infinity,
@@ -564,12 +568,14 @@ class _FloatingMessageMenu extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onFollowUp;
   final VoidCallback onSelectText;
+  final bool alignLeft;
 
   const _FloatingMessageMenu({
     required this.message,
     required this.isDarkMode,
     required this.layerLink,
     required this.showMenuAbove,
+    required this.alignLeft,
     required this.onDismiss,
     required this.onReply,
     required this.onCopy,
@@ -579,6 +585,22 @@ class _FloatingMessageMenu extends StatelessWidget {
     required this.onFollowUp,
     required this.onSelectText,
   });
+
+  Alignment get _targetAnchor {
+    if (showMenuAbove) {
+      return alignLeft ? Alignment.topLeft : Alignment.topRight;
+    } else {
+      return alignLeft ? Alignment.bottomLeft : Alignment.bottomRight;
+    }
+  }
+
+  Alignment get _followerAnchor {
+    if (showMenuAbove) {
+      return alignLeft ? Alignment.bottomLeft : Alignment.bottomRight;
+    } else {
+      return alignLeft ? Alignment.topLeft : Alignment.topRight;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -597,8 +619,8 @@ class _FloatingMessageMenu extends StatelessWidget {
           width: 200,
           child: CompositedTransformFollower(
             link: layerLink,
-            targetAnchor: showMenuAbove ? Alignment.topRight : Alignment.bottomRight,
-            followerAnchor: showMenuAbove ? Alignment.bottomRight : Alignment.topRight,
+            targetAnchor: _targetAnchor,
+            followerAnchor: _followerAnchor,
             offset: showMenuAbove ? const Offset(0, -8) : const Offset(0, 8),
             child: Material(
               elevation: 8,

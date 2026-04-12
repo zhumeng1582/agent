@@ -13,6 +13,7 @@ class Message {
   final bool isFavorite;
   final String? translatedContent;
   final bool? isStreaming;
+  final String? reasoning;
 
   Message({
     required this.id,
@@ -27,6 +28,7 @@ class Message {
     this.isFavorite = false,
     this.translatedContent,
     this.isStreaming = false,
+    this.reasoning,
   });
 
   Map<String, dynamic> toMap() {
@@ -42,6 +44,7 @@ class Message {
       'replyToContent': replyToContent,
       'isFavorite': isFavorite ? 1 : 0,
       'translatedContent': translatedContent,
+      'reasoning': reasoning,
     };
   }
 
@@ -59,6 +62,7 @@ class Message {
       isFavorite: map['isFavorite'] == 1,
       translatedContent: map['translatedContent'],
       isStreaming: map['isStreaming'] == 1,
+      reasoning: map['reasoning'],
     );
   }
 
@@ -75,6 +79,7 @@ class Message {
     bool? isFavorite,
     String? translatedContent,
     bool? isStreaming,
+    String? reasoning,
   }) {
     return Message(
       id: id ?? this.id,
@@ -89,6 +94,7 @@ class Message {
       isFavorite: isFavorite ?? this.isFavorite,
       translatedContent: translatedContent ?? this.translatedContent,
       isStreaming: isStreaming ?? this.isStreaming,
+      reasoning: reasoning ?? this.reasoning,
     );
   }
 

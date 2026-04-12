@@ -11,7 +11,7 @@ class MiniMaxService implements AIService {
   MiniMaxService(this._apiKey);
 
   @override
-  Future<String> chat(List<Map<String, String>> messages) async {
+  Future<ChatResponse> chat(List<Map<String, String>> messages) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/text/chatcompletion_v2'),
@@ -31,19 +31,21 @@ class MiniMaxService implements AIService {
       if (response.statusCode == 200) {
         final choices = data['choices'] as List?;
         if (choices != null && choices.isNotEmpty) {
-          final content = choices[0]['message']['content'];
-          return content ?? '抱歉，我没有收到回复';
+          final message = choices[0]['message'];
+          final content = message['content'] ?? '抱歉，我没有收到回复';
+          final reasoning = message['reasoning_content'] as String?;
+          return ChatResponse(content: content, reasoning: reasoning);
         }
         final baseResp = data['base_resp'];
         if (baseResp != null) {
-          return 'API错误: ${baseResp['status_code']} - ${baseResp['status_msg']}';
+          return ChatResponse(content: 'API错误: ${baseResp['status_code']} - ${baseResp['status_msg']}');
         }
-        return 'API返回格式未知: $data';
+        return ChatResponse(content: 'API返回格式未知: $data');
       } else {
-        return 'API错误: ${response.statusCode} - ${response.body}';
+        return ChatResponse(content: 'API错误: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      return '网络错误: $e';
+      return ChatResponse(content: '网络错误: $e');
     }
   }
 

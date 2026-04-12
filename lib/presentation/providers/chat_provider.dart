@@ -572,8 +572,6 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     await ensureInitialized();
 
     try {
-      String replyContent;
-
       // Build conversation history from current state (messages)
       final messages = <Map<String, String>>[];
 
@@ -631,7 +629,9 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
         }
       }
 
-      replyContent = await _aiService.chat(messages);
+      final chatResponse = await _aiService.chat(messages);
+      final replyContent = chatResponse.content;
+      final reasoning = chatResponse.reasoning;
 
       // Estimate tokens from response length (rough approximation: 1 token ≈ 2 chars)
       final estimatedTokens = (replyContent.length / 2).ceil();
@@ -645,6 +645,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
         timestamp: DateTime.now(),
         isFromMe: false,
         isStreaming: true,
+        reasoning: reasoning,
       );
 
       await _repository.saveMessage(reply);

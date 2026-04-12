@@ -1,5 +1,12 @@
+class ChatResponse {
+  final String content;
+  final String? reasoning;
+
+  ChatResponse({required this.content, this.reasoning});
+}
+
 abstract class AIService {
-  Future<String> chat(List<Map<String, String>> messages);
+  Future<ChatResponse> chat(List<Map<String, String>> messages);
   Future<String> chatImage(String message, String imagePath);
   Future<String> chatVoice(String message, String audioPath);
   Future<String> summarizeForTitle(String message);

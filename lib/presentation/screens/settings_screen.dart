@@ -308,7 +308,6 @@ class SettingsScreen extends ConsumerWidget {
     }
 
     return ListTile(
-      leading: Icon(themeIcon, color: AppColors.primary),
       title: Text(
         _getLocalizedText('theme', currentLocale),
         style: TextStyle(
@@ -318,6 +317,8 @@ class SettingsScreen extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(themeIcon, color: AppColors.primary, size: 20),
+          const SizedBox(width: 8),
           Text(
             themeText,
             style: TextStyle(

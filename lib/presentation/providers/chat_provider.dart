@@ -243,7 +243,8 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
 
     // Track consecutive user messages and generate suggestions after 3+
     _consecutiveUserMessages++;
-    if (_consecutiveUserMessages >= 3) {
+    if (_consecutiveUserMessages == 3) {
+      // Only generate suggestions once at exactly 3 consecutive messages
       _generateFollowUpSuggestions(content);
     }
   }
@@ -254,6 +255,10 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   Future<void> _generateFollowUpSuggestions(String latestMessage) async {
+    // Check if suggestions already exist
+    final existingTopics = _ref.read(suggestedTopicsProvider(_chatId));
+    if (existingTopics.isNotEmpty) return;
+
     // Build conversation context from last few messages
     final recentMessages = state.reversed.take(10).toList();
     final contextBuilder = StringBuffer();

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/constants/usage_provider.dart';
@@ -29,6 +30,10 @@ final imageServiceProvider = Provider<ImageService>((ref) {
 });
 
 final aiServiceProvider = Provider<AIService>((ref) {
+  return MiniMaxService(AppConfig.minimaxApiKey);
+});
+
+final minimaxServiceProvider = Provider<MiniMaxService>((ref) {
   return MiniMaxService(AppConfig.minimaxApiKey);
 });
 
@@ -141,7 +146,8 @@ final messagesProvider = StateNotifierProvider.family<MessagesNotifier, List<Mes
   (ref, chatId) => MessagesNotifier(ref, chatId),
 );
 
-final isLoadingProvider = StateProvider<bool>((ref) => false);
+// 正在等待AI回复的会话ID集合，可以同时多个会话在loading
+final loadingChatIdsProvider = StateProvider<Set<String>>((ref) => {});
 
 class MessagesNotifier extends StateNotifier<List<Message>> {
   final Ref _ref;
@@ -206,8 +212,10 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     // Check usage limit before AI reply
     final canUse = await _ref.read(usageProvider.notifier).tryUse();
     if (canUse) {
-      // Check if user wants to generate an image
-      if (_isImageGenerationRequest(content)) {
+      // Check if user wants to generate a video
+      if (_isVideoGenerationRequest(content)) {
+        _addAIGeneratedVideoReply(message);
+      } else if (_isImageGenerationRequest(content)) {
         _addAIGeneratedImageReply(message);
       } else {
         _addAIReply(message);
@@ -231,7 +239,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   Future<void> _addAIGeneratedImageReply(Message originalMessage) async {
-    _ref.read(isLoadingProvider.notifier).state = true;
+    _ref.read(loadingChatIdsProvider.notifier).state = {..._ref.read(loadingChatIdsProvider), _chatId};
 
     try {
       final imagePath = await _aiService.generateImage(originalMessage.content ?? '');
@@ -273,7 +281,130 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       await _repository.saveMessage(errorReply);
       state = [...state, errorReply];
     } finally {
-      _ref.read(isLoadingProvider.notifier).state = false;
+      _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
+    }
+  }
+
+  bool _isVideoGenerationRequest(String content) {
+    final keywords = [
+      // Chinese
+      '生成视频', '生成一段视频', '做个视频', '制作视频', '创建视频', '给我一个视频', '生成短视频',
+      // English
+      'generate a video', 'generate video', 'create a video', 'make a video', 'give me a video',
+    ];
+    final lower = content.toLowerCase();
+    return keywords.any((k) => lower.contains(k));
+  }
+
+  Future<void> _addAIGeneratedVideoReply(Message originalMessage) async {
+    _ref.read(loadingChatIdsProvider.notifier).state = {..._ref.read(loadingChatIdsProvider), _chatId};
+
+    // Create a placeholder message first
+    final placeholderMessage = Message(
+      id: _uuid.v4(),
+      chatId: _chatId,
+      type: MessageType.text,
+      content: '正在生成视频，请稍候...',
+      timestamp: DateTime.now(),
+      isFromMe: false,
+    );
+    await _repository.saveMessage(placeholderMessage);
+    state = [...state, placeholderMessage];
+
+    try {
+      final minimaxService = _aiService as MiniMaxService;
+      final taskId = await minimaxService.createVideoTask(
+        originalMessage.content ?? '',
+        duration: 6,
+        resolution: '768P',
+      );
+
+      // Poll for video completion
+      String? videoUrl;
+      String? fileId;
+      while (videoUrl == null || videoUrl.isEmpty) {
+        await Future.delayed(const Duration(seconds: 5));
+        final result = await minimaxService.queryVideoTaskStatus(taskId);
+        final status = result['status'] as String;
+        final videoUrlFromResult = result['video_url'] as String?;
+        final fileIdFromResult = result['file_id'] as String?;
+        debugPrint('Video task status: $status, video_url: $videoUrlFromResult, file_id: $fileIdFromResult');
+
+        if (status == 'Success') {
+          // Try video_url first, otherwise use file_id to get download URL
+          videoUrl = videoUrlFromResult;
+          if (videoUrl == null || videoUrl.isEmpty) {
+            fileId = fileIdFromResult;
+            if (fileId != null && fileId.isNotEmpty) {
+              debugPrint('Getting download URL from file_id: $fileId');
+              videoUrl = await minimaxService.getVideoDownloadUrl(fileId);
+              debugPrint('Download URL from file_id: $videoUrl');
+            }
+          }
+          if (videoUrl != null && videoUrl.isNotEmpty) {
+            break;
+          }
+        } else if (status == 'Fail') {
+          throw Exception(result['error'] ?? '视频生成失败');
+        }
+      }
+
+      debugPrint('Final video URL: $videoUrl');
+      if (videoUrl != null && videoUrl.isNotEmpty) {
+        // Replace placeholder with video message (store URL directly)
+        final videoMessage = Message(
+          id: _uuid.v4(),
+          chatId: _chatId,
+          type: MessageType.video,
+          mediaPath: videoUrl,
+          timestamp: DateTime.now(),
+          isFromMe: false,
+        );
+
+        // Remove placeholder
+        await _repository.deleteMessage(placeholderMessage.id);
+        state = state.where((m) => m.id != placeholderMessage.id).toList();
+
+        // Add video message
+        await _repository.saveMessage(videoMessage);
+        state = [...state, videoMessage];
+        _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, '[视频]');
+      } else {
+        // No URL obtained
+        final errorMessage = Message(
+          id: _uuid.v4(),
+          chatId: _chatId,
+          type: MessageType.text,
+          content: '视频生成失败: 无法获取视频链接',
+          timestamp: DateTime.now(),
+          isFromMe: false,
+        );
+
+        await _repository.deleteMessage(placeholderMessage.id);
+        state = state.where((m) => m.id != placeholderMessage.id).toList();
+
+        await _repository.saveMessage(errorMessage);
+        state = [...state, errorMessage];
+      }
+    } catch (e) {
+      debugPrint('Video generation error: $e');
+      // Replace placeholder with error message
+      final errorMessage = Message(
+        id: _uuid.v4(),
+        chatId: _chatId,
+        type: MessageType.text,
+        content: '视频生成失败: $e',
+        timestamp: DateTime.now(),
+        isFromMe: false,
+      );
+
+      await _repository.deleteMessage(placeholderMessage.id);
+      state = state.where((m) => m.id != placeholderMessage.id).toList();
+
+      await _repository.saveMessage(errorMessage);
+      state = [...state, errorMessage];
+    } finally {
+      _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
     }
   }
 
@@ -352,7 +483,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   void _addLimitExceededMessage() {
-    _ref.read(isLoadingProvider.notifier).state = false;
+    _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
     final limitMessage = Message(
       id: _uuid.v4(),
       chatId: _chatId,
@@ -367,22 +498,54 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
   }
 
   Future<void> _addAIReply(Message originalMessage) async {
-    _ref.read(isLoadingProvider.notifier).state = true;
+    _ref.read(loadingChatIdsProvider.notifier).state = {..._ref.read(loadingChatIdsProvider), _chatId};
 
     try {
       String replyContent;
+
+      // Build conversation history from current state (messages)
+      final messages = <Map<String, String>>[];
+
+      // Add previous messages as history (up to last 20 to avoid token limits)
+      final historyMessages = state.take(20);
+      for (final msg in historyMessages) {
+        if (msg.type == MessageType.text && msg.content != null) {
+          messages.add({
+            'role': msg.isFromMe ? 'user' : 'assistant',
+            'content': msg.content!,
+          });
+        }
+      }
+
+      // Add current message
       switch (originalMessage.type) {
         case MessageType.text:
-          replyContent = await _aiService.chat(originalMessage.content ?? '');
+          messages.add({
+            'role': 'user',
+            'content': originalMessage.content ?? '',
+          });
+          replyContent = await _aiService.chat(messages);
           break;
         case MessageType.voice:
-          replyContent = await _aiService.chatVoice(
-            originalMessage.content ?? '语音消息',
-            originalMessage.mediaPath ?? '',
-          );
+          messages.add({
+            'role': 'user',
+            'content': originalMessage.content ?? '语音消息',
+          });
+          replyContent = await _aiService.chat(messages);
           break;
         case MessageType.image:
-          replyContent = '收到图片';
+          messages.add({
+            'role': 'user',
+            'content': '用户发送了一张图片',
+          });
+          replyContent = await _aiService.chat(messages);
+          break;
+        case MessageType.video:
+          messages.add({
+            'role': 'user',
+            'content': '用户发送了一个视频',
+          });
+          replyContent = await _aiService.chat(messages);
           break;
       }
 
@@ -397,11 +560,19 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
         content: replyContent,
         timestamp: DateTime.now(),
         isFromMe: false,
+        isStreaming: true,
       );
 
       await _repository.saveMessage(reply);
       state = [...state, reply];
       _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, replyContent);
+
+      // Mark streaming as complete after a delay to trigger typewriter animation
+      Future.delayed(const Duration(milliseconds: 100), () {
+        final completedReply = reply.copyWith(isStreaming: false);
+        _repository.saveMessage(completedReply);
+        updateMessage(completedReply);
+      });
     } catch (e) {
       final errorReply = Message(
         id: _uuid.v4(),
@@ -414,12 +585,12 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       await _repository.saveMessage(errorReply);
       state = [...state, errorReply];
     } finally {
-      _ref.read(isLoadingProvider.notifier).state = false;
+      _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
     }
   }
 
   Future<void> _addAIImageReply(Message originalMessage) async {
-    _ref.read(isLoadingProvider.notifier).state = true;
+    _ref.read(loadingChatIdsProvider.notifier).state = {..._ref.read(loadingChatIdsProvider), _chatId};
 
     try {
       final replyContent = await _aiService.chatImage(
@@ -451,7 +622,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       await _repository.saveMessage(errorReply);
       state = [...state, errorReply];
     } finally {
-      _ref.read(isLoadingProvider.notifier).state = false;
+      _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
     }
   }
 

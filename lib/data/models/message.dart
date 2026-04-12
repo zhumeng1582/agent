@@ -1,4 +1,4 @@
-enum MessageType { text, image, voice }
+enum MessageType { text, image, voice, video }
 
 class Message {
   final String id;
@@ -12,6 +12,7 @@ class Message {
   final String? replyToContent;
   final bool isFavorite;
   final String? translatedContent;
+  final bool isStreaming;
 
   Message({
     required this.id,
@@ -25,6 +26,7 @@ class Message {
     this.replyToContent,
     this.isFavorite = false,
     this.translatedContent,
+    this.isStreaming = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -56,6 +58,7 @@ class Message {
       replyToContent: map['replyToContent'],
       isFavorite: map['isFavorite'] == 1,
       translatedContent: map['translatedContent'],
+      isStreaming: map['isStreaming'] == 1,
     );
   }
 
@@ -71,6 +74,7 @@ class Message {
     String? replyToContent,
     bool? isFavorite,
     String? translatedContent,
+    bool? isStreaming,
   }) {
     return Message(
       id: id ?? this.id,
@@ -84,6 +88,7 @@ class Message {
       replyToContent: replyToContent ?? this.replyToContent,
       isFavorite: isFavorite ?? this.isFavorite,
       translatedContent: translatedContent ?? this.translatedContent,
+      isStreaming: isStreaming ?? this.isStreaming,
     );
   }
 

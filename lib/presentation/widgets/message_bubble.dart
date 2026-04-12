@@ -597,8 +597,8 @@ class _FloatingMessageMenu extends StatelessWidget {
           width: 200,
           child: CompositedTransformFollower(
             link: layerLink,
-            targetAnchor: showMenuAbove ? Alignment.bottomRight : Alignment.topRight,
-            followerAnchor: showMenuAbove ? Alignment.topRight : Alignment.bottomRight,
+            targetAnchor: showMenuAbove ? Alignment.topRight : Alignment.bottomRight,
+            followerAnchor: showMenuAbove ? Alignment.bottomRight : Alignment.topRight,
             offset: showMenuAbove ? const Offset(0, -8) : const Offset(0, 8),
             child: Material(
               elevation: 8,

@@ -13,16 +13,19 @@ class MiniMaxService implements AIService {
   @override
   Future<ChatResponse> chat(List<Map<String, String>> messages) async {
     try {
+      final requestBody = {
+        'model': 'MiniMax-M2.7',
+        'messages': messages,
+      };
+      debugPrint('MiniMax 请求: ${jsonEncode(requestBody)}');
+
       final response = await http.post(
         Uri.parse('$_baseUrl/text/chatcompletion_v2'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_apiKey',
         },
-        body: jsonEncode({
-          'model': 'MiniMax-M2.7',
-          'messages': messages,
-        }),
+        body: jsonEncode(requestBody),
       );
 
       final data = jsonDecode(response.body);

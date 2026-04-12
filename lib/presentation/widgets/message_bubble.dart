@@ -64,64 +64,56 @@ class MessageBubble extends ConsumerWidget {
         // Message bubble
         GestureDetector(
           onLongPress: () => _showMessageMenu(context),
-          child: Padding(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              mainAxisAlignment:
-                  isFromMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment:
+                  isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment:
-                        isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                    children: [
-                      // Reply quote
-                      if (message.replyToContent != null) _buildReplyQuote(fontSize),
-                      // Message content with bubble
-                      _buildBubble(context, isFromMe),
-                      const SizedBox(height: 4),
-                      // Timestamp, status, TTS button and favorite
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            timeFormat.format(message.timestamp),
-                            style: TextStyle(
-                              fontSize: 11.0 * fontSize.scale,
-                              color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                            ),
-                          ),
-                          if (isFromMe) ...[
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.done_all,
-                              size: 14,
-                              color: AppColors.primary.withValues(alpha: 0.7),
-                            ),
-                          ],
-                          if (!isFromMe && message.type == MessageType.text) ...[
-                            const SizedBox(width: 8),
-                            _buildTTSButton(context, ref),
-                          ],
-                          if (message.isFavorite) ...[
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: onFavorite,
-                              child: Icon(
-                                Icons.star,
-                                size: 14,
-                                color: Colors.amber,
-                              ),
-                            ),
-                          ],
-                        ],
+                // Reply quote
+                if (message.replyToContent != null) _buildReplyQuote(fontSize),
+                // Message content with bubble
+                _buildBubble(context, isFromMe),
+                const SizedBox(height: 4),
+                // Timestamp, status, TTS button and favorite
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      timeFormat.format(message.timestamp),
+                      style: TextStyle(
+                        fontSize: 11.0 * fontSize.scale,
+                        color: isDarkMode ? AppColors.textSecondaryDark : AppColors.textSecondary,
                       ),
-                      // Translation display
-                      _buildTranslationDisplay(ref),
+                    ),
+                    if (isFromMe) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.done_all,
+                        size: 14,
+                        color: AppColors.primary.withValues(alpha: 0.7),
+                      ),
                     ],
-                  ),
+                    if (!isFromMe && message.type == MessageType.text) ...[
+                      const SizedBox(width: 8),
+                      _buildTTSButton(context, ref),
+                    ],
+                    if (message.isFavorite) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: onFavorite,
+                        child: Icon(
+                          Icons.star,
+                          size: 14,
+                          color: Colors.amber,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                // Translation display
+                _buildTranslationDisplay(ref),
               ],
             ),
           ),
@@ -133,7 +125,7 @@ class MessageBubble extends ConsumerWidget {
   Widget _buildBubble(BuildContext context, bool isFromMe) {
     return Container(
       constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.72,
+        maxWidth: MediaQuery.of(context).size.width * 0.85,
       ),
       decoration: BoxDecoration(
         gradient: isFromMe

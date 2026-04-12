@@ -201,6 +201,7 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(
         _getLocalizedText('language', currentLocale),
         style: TextStyle(
+          fontSize: 16,
           color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),
@@ -347,6 +348,7 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(
         _getLocalizedText('theme', currentLocale),
         style: TextStyle(
+          fontSize: 16,
           color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),
@@ -505,6 +507,7 @@ class SettingsScreen extends ConsumerWidget {
       title: Text(
         _getLocalizedText('fontSize', locale),
         style: TextStyle(
+          fontSize: 16,
           color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),

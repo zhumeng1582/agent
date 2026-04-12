@@ -20,6 +20,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
   final String chatName;
   final bool isTempChat;
   final String? highlightMessageId;
+  final String? initialMessage;  // For follow-up feature
 
   const ChatRoomScreen({
     super.key,
@@ -27,6 +28,7 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
     required this.chatName,
     this.isTempChat = false,
     this.highlightMessageId,
+    this.initialMessage,
   });
 
   @override
@@ -54,7 +56,20 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         _scrollToBottom(animated: false);
       }
       _initialized = true;
+      // Auto-send initial message for follow-up feature
+      if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
+        _sendInitialMessage(widget.initialMessage!);
+      }
     });
+  }
+
+  Future<void> _sendInitialMessage(String content) async {
+    // Create the chat first if it's a temp chat
+    if (widget.isTempChat) {
+      await ref.read(chatsProvider.notifier).createChatForTemp(widget.chatId);
+    }
+    // Send the message
+    await ref.read(messagesProvider(_actualChatId).notifier).sendTextMessage(content);
   }
 
   @override
@@ -161,6 +176,21 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     setState(() {
       _replyToMessage = null;
     });
+  }
+
+  void _createFollowUpChat(BuildContext context, Message message) {
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatRoomScreen(
+          chatId: tempId,
+          chatName: '追问',
+          isTempChat: true,
+          initialMessage: message.content ?? '',
+        ),
+      ),
+    );
   }
 
   String _t(String key, Locale locale) {
@@ -399,6 +429,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           onDelete: () => ref.read(messagesProvider(_actualChatId).notifier).deleteMessage(message.id),
                           onFavorite: () => _toggleFavorite(message),
                           onTranslate: () => _translateMessage(message),
+                          onFollowUp: (msg) => _createFollowUpChat(context, msg),
                         );
                       },
                     ),

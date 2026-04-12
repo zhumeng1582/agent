@@ -82,6 +82,17 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Text(
+              _getLocalizedText('poweredBy', currentLocale),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -641,6 +652,7 @@ class SettingsScreen extends ConsumerWidget {
       'version': {'en': 'Version', 'zh': '版本', 'zh_TW': '版本'},
       'modelVersion': {'en': 'Model Version', 'zh': '模型版本', 'zh_TW': '模型版本'},
       'developer': {'en': 'Developer', 'zh': '开发者', 'zh_TW': '開發者'},
+      'poweredBy': {'en': 'Powered by MiniMax-M2.7', 'zh': '由MiniMax-M2.7提供技术支持', 'zh_TW': '由MiniMax-M2.7提供技術支持'},
       'language': {'en': 'Language', 'zh': '语言', 'zh_TW': '語言'},
       'selectLanguage': {'en': 'Select Language', 'zh': '选择语言', 'zh_TW': '選擇語言'},
       'fontSize': {'en': 'Font Size', 'zh': '字体大小', 'zh_TW': '字體大小'},

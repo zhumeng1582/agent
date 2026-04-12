@@ -16,7 +16,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 4) {
           try {
@@ -24,6 +24,11 @@ class DatabaseService {
           } catch (_) {}
           try {
             await db.execute('ALTER TABLE messages ADD COLUMN translatedContent TEXT');
+          } catch (_) {}
+        }
+        if (oldVersion < 5) {
+          try {
+            await db.execute('ALTER TABLE messages ADD COLUMN reasoning TEXT');
           } catch (_) {}
         }
       },
@@ -51,7 +56,8 @@ class DatabaseService {
             replyToId TEXT,
             replyToContent TEXT,
             isFavorite INTEGER DEFAULT 0,
-            translatedContent TEXT
+            translatedContent TEXT,
+            reasoning TEXT
           )
         ''');
 

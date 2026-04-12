@@ -543,6 +543,23 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
         'role': 'user',
         'content': userContent,
       });
+
+      // Add reply chain context if the replied message was itself a reply
+      if (originalMessage.replyToId != null) {
+        // Find the message being replied to and check if it was also a reply
+        final repliedMessage = state.firstWhere(
+          (m) => m.id == originalMessage.replyToId,
+          orElse: () => originalMessage,
+        );
+        if (repliedMessage.replyToContent != null && repliedMessage.replyToContent!.isNotEmpty) {
+          // Modify the last message to include the reply chain
+          messages[messages.length - 1] = {
+            'role': 'user',
+            'content': '用户回复的是AI助手之前的消息"${repliedMessage.replyToContent}"，该消息的内容是"${repliedMessage.content}"。\n\n用户的回复：$userContent',
+          };
+        }
+      }
+
       replyContent = await _aiService.chat(messages);
 
       // Estimate tokens from response length (rough approximation: 1 token ≈ 2 chars)

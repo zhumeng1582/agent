@@ -6,6 +6,7 @@ import '../../core/constants/theme_provider.dart';
 import '../../core/constants/font_size_provider.dart';
 import '../../data/models/message.dart';
 import '../../data/services/database_service.dart';
+import 'chat_room_screen.dart';
 
 final favoriteMessagesProvider = FutureProvider<List<Message>>((ref) async {
   final maps = await DatabaseService.getFavoriteMessages();
@@ -134,22 +135,36 @@ class FavoritesScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          MarkdownBody(
-            data: message.content ?? '',
-            styleSheet: MarkdownStyleSheet(
-              p: TextStyle(
-                color: isDarkMode ? Colors.white : AppColors.textPrimary,
-                fontSize: 15.0 * fontSize.scale,
-                height: 1.4,
-              ),
-              code: TextStyle(
-                color: isDarkMode ? Colors.white : AppColors.textPrimary,
-                backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[200],
-                fontSize: 14.0 * fontSize.scale,
-              ),
-              codeblockDecoration: BoxDecoration(
-                color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ChatRoomScreen(
+                    chatId: message.chatId,
+                    chatName: '聊天',
+                    highlightMessageId: message.id,
+                  ),
+                ),
+              );
+            },
+            child: MarkdownBody(
+              data: message.content ?? '',
+              styleSheet: MarkdownStyleSheet(
+                p: TextStyle(
+                  color: isDarkMode ? Colors.white : AppColors.textPrimary,
+                  fontSize: 15.0 * fontSize.scale,
+                  height: 1.4,
+                ),
+                code: TextStyle(
+                  color: isDarkMode ? Colors.white : AppColors.textPrimary,
+                  backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                  fontSize: 14.0 * fontSize.scale,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: isDarkMode ? AppColors.surfaceDark : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),

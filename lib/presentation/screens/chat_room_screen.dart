@@ -19,12 +19,14 @@ class ChatRoomScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String chatName;
   final bool isTempChat;
+  final String? highlightMessageId;
 
   const ChatRoomScreen({
     super.key,
     required this.chatId,
     required this.chatName,
     this.isTempChat = false,
+    this.highlightMessageId,
   });
 
   @override
@@ -46,7 +48,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     _chatTitle = widget.chatName;
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom(animated: false);
+      if (widget.highlightMessageId != null) {
+        _scrollToMessage(widget.highlightMessageId!);
+      } else {
+        _scrollToBottom(animated: false);
+      }
       _initialized = true;
     });
   }
@@ -86,6 +92,23 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
       } else {
         _scrollController.jumpTo(maxScroll);
       }
+    }
+  }
+
+  void _scrollToMessage(String messageId) {
+    final messages = ref.read(messagesProvider(_actualChatId));
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index != -1 && _scrollController.hasClients) {
+      // Estimate item height (message bubble + padding + timestamp)
+      const itemHeight = 120.0;
+      final targetOffset = index * itemHeight;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final clampedOffset = targetOffset.clamp(0.0, maxScroll);
+      _scrollController.animateTo(
+        clampedOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     }
   }
 

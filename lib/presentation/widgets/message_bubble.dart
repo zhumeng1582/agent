@@ -40,7 +40,6 @@ class MessageBubble extends ConsumerStatefulWidget {
 
 class _MessageBubbleState extends ConsumerState<MessageBubble> {
   OverlayEntry? _overlayEntry;
-  final LayerLink _layerLink = LayerLink();
   bool _isMenuVisible = false;
   bool _isSelectionMode = false;
   String? _selectedText;
@@ -87,17 +86,35 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
 
     _removeOverlay();
 
-    // Calculate if message is in lower half of screen
+    // Get absolute position of the tap point
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
-    bool showMenuAbove = true;
+    if (renderBox == null) return;
+
+    final menuSize = const Size(200, 300); // Approximate menu size
+    final screenSize = MediaQuery.of(context).size;
+    final tapGlobalPosition = renderBox.localToGlobal(tapPosition);
+
+    // Determine horizontal position
+    double left = tapGlobalPosition.dx;
     bool alignLeft = false;
-    if (renderBox != null) {
-      final messagePosition = renderBox.localToGlobal(Offset.zero);
-      final screenHeight = MediaQuery.of(context).size.height;
-      // If message is in lower 40% of screen, show menu above
-      showMenuAbove = messagePosition.dy > screenHeight * 0.4;
-      // If tap is in left half of message, align menu to the left
-      alignLeft = tapPosition.dx < renderBox.size.width / 2;
+    // If tap is in right half, align menu to left of tap point
+    if (tapPosition.dx > renderBox.size.width / 2) {
+      left = tapGlobalPosition.dx - menuSize.width + 16;
+      alignLeft = true;
+    }
+    // Ensure menu stays within screen bounds
+    if (left < 8) left = 8;
+    if (left + menuSize.width > screenSize.width - 8) {
+      left = screenSize.width - menuSize.width - 8;
+    }
+
+    // Determine vertical position
+    double top = tapGlobalPosition.dy;
+    bool showMenuAbove = false;
+    // If not enough space below, show above
+    if (tapGlobalPosition.dy + menuSize.height > screenSize.height - 100) {
+      top = tapGlobalPosition.dy - menuSize.height;
+      showMenuAbove = true;
     }
 
     final overlay = Overlay.of(context);
@@ -106,7 +123,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
       builder: (context) => _FloatingMessageMenu(
         message: widget.message,
         isDarkMode: widget.isDarkMode,
-        layerLink: _layerLink,
+        menuPosition: Offset(left, top),
         showMenuAbove: showMenuAbove,
         alignLeft: alignLeft,
         onDismiss: _removeOverlay,
@@ -208,15 +225,13 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
             ),
           ),
         // Message bubble
-        CompositedTransformTarget(
-          link: _layerLink,
-          child: GestureDetector(
-            onLongPressDown: (details) => _showFloatingMenu(context, details.localPosition),
-            onSecondaryTapDown: (details) => _showFloatingMenu(context, details.localPosition),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              width: double.infinity,
-              child: Column(
+        GestureDetector(
+          onLongPressDown: (details) => _showFloatingMenu(context, details.localPosition),
+          onSecondaryTapDown: (details) => _showFloatingMenu(context, details.localPosition),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            width: double.infinity,
+            child: Column(
                 crossAxisAlignment:
                     isFromMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
@@ -294,7 +309,6 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -558,7 +572,6 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
 class _FloatingMessageMenu extends StatelessWidget {
   final Message message;
   final bool isDarkMode;
-  final LayerLink layerLink;
   final bool showMenuAbove;
   final VoidCallback onDismiss;
   final VoidCallback onReply;
@@ -569,13 +582,14 @@ class _FloatingMessageMenu extends StatelessWidget {
   final VoidCallback onFollowUp;
   final VoidCallback onSelectText;
   final bool alignLeft;
+  final Offset menuPosition;
 
   const _FloatingMessageMenu({
     required this.message,
     required this.isDarkMode,
-    required this.layerLink,
     required this.showMenuAbove,
     required this.alignLeft,
+    required this.menuPosition,
     required this.onDismiss,
     required this.onReply,
     required this.onCopy,
@@ -585,22 +599,6 @@ class _FloatingMessageMenu extends StatelessWidget {
     required this.onFollowUp,
     required this.onSelectText,
   });
-
-  Alignment get _targetAnchor {
-    if (showMenuAbove) {
-      return alignLeft ? Alignment.topLeft : Alignment.topRight;
-    } else {
-      return alignLeft ? Alignment.bottomLeft : Alignment.bottomRight;
-    }
-  }
-
-  Alignment get _followerAnchor {
-    if (showMenuAbove) {
-      return alignLeft ? Alignment.bottomLeft : Alignment.bottomRight;
-    } else {
-      return alignLeft ? Alignment.topLeft : Alignment.topRight;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -614,31 +612,29 @@ class _FloatingMessageMenu extends StatelessWidget {
             child: Container(color: Colors.transparent),
           ),
         ),
-        // Menu
+        // Menu - positioned at the calculated tap position
         Positioned(
-          width: 200,
-          child: CompositedTransformFollower(
-            link: layerLink,
-            targetAnchor: _targetAnchor,
-            followerAnchor: _followerAnchor,
-            offset: showMenuAbove ? const Offset(0, -8) : const Offset(0, 8),
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(16),
-              color: isDarkMode ? AppColors.surfaceDark : Colors.white,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (message.type == MessageType.text) ...[
-                      _buildMenuItem(
-                        icon: Icons.text_fields,
-                        title: '选取文字',
-                        onTap: onSelectText,
-                      ),
-                      _buildMenuItem(
-                        icon: Icons.copy_rounded,
+          left: menuPosition.dx,
+          top: showMenuAbove ? null : menuPosition.dy + 8,
+          bottom: showMenuAbove ? MediaQuery.of(context).size.height - menuPosition.dy + 8 : null,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(16),
+            color: isDarkMode ? AppColors.surfaceDark : Colors.white,
+            child: Container(
+              width: 200,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (message.type == MessageType.text) ...[
+                    _buildMenuItem(
+                      icon: Icons.text_fields,
+                      title: '选取文字',
+                      onTap: onSelectText,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.copy_rounded,
                         title: '复制',
                         onTap: onCopy,
                       ),
@@ -682,7 +678,6 @@ class _FloatingMessageMenu extends StatelessWidget {
               ),
             ),
           ),
-        ),
       ],
     );
   }

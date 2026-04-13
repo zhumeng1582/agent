@@ -1,19 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import '../../data/services/minimax_service.dart';
-import 'app_config.dart';
-
-List<int> _hexDecode(String hexString) {
-  final result = <int>[];
-  for (int i = 0; i < hexString.length; i += 2) {
-    result.add(int.parse(hexString.substring(i, i + 2), radix: 16));
-  }
-  return result;
-}
+import '../../data/services/api_service.dart';
 
 final ttsProvider = StateNotifierProvider<TTSNotifier, TTSState>((ref) {
   return TTSNotifier();
@@ -60,27 +50,25 @@ class TTSNotifier extends StateNotifier<TTSState> {
     state = TTSState(isPlaying: true, playingMessageId: messageId);
 
     try {
-      final service = MiniMaxService(AppConfig.minimaxApiKey);
-      final base64Audio = await service.textToSpeech(text);
-
-      debugPrint('TTS returned: "$base64Audio"');
-
-      if (base64Audio.isEmpty) {
-        state = TTSState(error: '语音合成失败');
-        return '语音合成失败';
+      final response = await ApiService.textToSpeech(text);
+      if (!response.success) {
+        state = TTSState(error: response.error ?? '语音合成失败');
+        return response.error ?? '语音合成失败';
       }
 
-      debugPrint('TTS audio length: ${base64Audio.length}');
+      final bytes = response.data?['bytes'];
+      if (bytes == null || bytes is! List<int>) {
+        state = TTSState(error: '语音数据无效');
+        return '语音数据无效';
+      }
 
-      // Decode hex and save to temp file
+      // Save to temp file and play
       final tempDir = await getTemporaryDirectory();
-      final audioBytes = _hexDecode(base64Audio);
       final filePath = '${tempDir.path}/tts_$messageId.mp3';
       final file = File(filePath);
-      await file.writeAsBytes(audioBytes);
-      debugPrint('TTS file saved: $filePath, size: ${audioBytes.length}');
-      // Print first few bytes to help debug format
-      debugPrint('First bytes: ${audioBytes.take(16).map((b) => b.toRadixString(16)).join(' ')}');
+      await file.writeAsBytes(bytes);
+      debugPrint('TTS file saved: $filePath, size: ${bytes.length}');
+
       await _audioPlayer.play(DeviceFileSource(filePath));
       return '播放中';
     } catch (e) {

@@ -9,26 +9,23 @@ class ChatSettingsScreen extends ConsumerWidget {
   final String chatId;
   final String currentTitle;
   final Function(String) onTitleChanged;
-  final VoidCallback onClearChat;
+  final VoidCallback onDeleted;
 
   const ChatSettingsScreen({
     super.key,
     required this.chatId,
     required this.currentTitle,
     required this.onTitleChanged,
-    required this.onClearChat,
+    required this.onDeleted,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final locale = ref.watch(localeProvider);
-    final chats = ref.watch(chatsProvider);
-    final chat = chats.firstWhere(
-      (c) => c.id == chatId,
-      orElse: () => throw Exception('Chat not found'),
-    );
-    final liveTitle = chat.name;
+    // Use currentTitle passed from parent instead of looking up from provider
+    // This avoids issues when chat is deleted while settings screen is open
+    final liveTitle = currentTitle;
 
     return Scaffold(
       backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.background,
@@ -58,7 +55,7 @@ class ChatSettingsScreen extends ConsumerWidget {
             title: _t('dangerZone', locale),
             isDarkMode: isDarkMode,
             children: [
-              _buildClearChatTile(context, locale, isDarkMode),
+              _buildDeleteConversationTile(context, locale, isDarkMode, ref),
             ],
           ),
         ],
@@ -146,29 +143,29 @@ class ChatSettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildClearChatTile(BuildContext context, Locale locale, bool isDarkMode) {
+  Widget _buildDeleteConversationTile(BuildContext context, Locale locale, bool isDarkMode, WidgetRef ref) {
     return ListTile(
       leading: const Icon(Icons.delete_outline, color: Colors.red),
       title: Text(
-        _t('clearChat', locale),
+        _t('deleteConversation', locale),
         style: const TextStyle(color: Colors.red),
       ),
-      onTap: () => _showClearChatDialog(context, locale, isDarkMode),
+      onTap: () => _showDeleteConversationDialog(context, locale, isDarkMode, ref),
     );
   }
 
-  void _showClearChatDialog(BuildContext context, Locale locale, bool isDarkMode) {
+  void _showDeleteConversationDialog(BuildContext context, Locale locale, bool isDarkMode, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(
-          _t('clearChat', locale),
+          _t('deleteConversation', locale),
           style: TextStyle(
             color: isDarkMode ? Colors.white : Colors.black,
           ),
         ),
         content: Text(
-          _t('clearChatConfirm', locale),
+          _t('deleteConversationConfirm', locale),
           style: TextStyle(
             color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
           ),
@@ -176,14 +173,17 @@ class ChatSettingsScreen extends ConsumerWidget {
         backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(_t('cancel', locale)),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              onClearChat();
+            onPressed: () async {
+              // Delete first before closing screens
+              await ref.read(chatsProvider.notifier).deleteChat(chatId);
+              if (!context.mounted) return;
+              Navigator.pop(dialogContext); // close dialog
+              Navigator.pop(context); // close settings screen
+              onDeleted();
             },
             child: Text(_t('confirm', locale), style: const TextStyle(color: Colors.red)),
           ),
@@ -199,8 +199,8 @@ class ChatSettingsScreen extends ConsumerWidget {
       'editTitle': {'en': 'Edit Title', 'zh': '修改标题', 'zh_TW': '修改標題'},
       'titleHint': {'en': 'Enter chat title', 'zh': '输入聊天标题', 'zh_TW': '輸入聊天標題'},
       'dangerZone': {'en': 'Danger Zone', 'zh': '危险操作', 'zh_TW': '危險操作'},
-      'clearChat': {'en': 'Clear Chat', 'zh': '清空聊天', 'zh_TW': '清空聊天'},
-      'clearChatConfirm': {'en': 'Are you sure you want to clear all messages?', 'zh': '确定要清空所有消息吗？', 'zh_TW': '確定要清空所有訊息嗎？'},
+      'deleteConversation': {'en': 'Delete Conversation', 'zh': '删除会话', 'zh_TW': '刪除會話'},
+      'deleteConversationConfirm': {'en': 'Are you sure you want to delete this conversation? This cannot be undone.', 'zh': '确定要删除此会话吗？此操作无法撤销。', 'zh_TW': '確定要刪除此會話嗎？此操作無法撤銷。'},
       'cancel': {'en': 'Cancel', 'zh': '取消', 'zh_TW': '取消'},
       'confirm': {'en': 'Confirm', 'zh': '确定', 'zh_TW': '確定'},
     };

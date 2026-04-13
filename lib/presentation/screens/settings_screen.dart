@@ -5,8 +5,10 @@ import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
 import '../../core/constants/font_size_provider.dart';
 import '../../core/constants/usage_provider.dart';
+import '../../core/constants/auth_provider.dart';
 import 'avatar_edit_screen.dart';
 import 'favorites_screen.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -42,6 +44,7 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               _buildAvatarEditTile(context, ref, currentLocale, isDarkMode),
               _buildFavoritesTile(context, currentLocale, isDarkMode),
+              _buildLogoutTile(context, ref, currentLocale, isDarkMode),
             ],
           ),
           _buildSection(
@@ -203,6 +206,53 @@ class SettingsScreen extends ConsumerWidget {
           context,
           MaterialPageRoute(builder: (context) => const FavoritesScreen()),
         );
+      },
+    );
+  }
+
+  Widget _buildLogoutTile(BuildContext context, WidgetRef ref, Locale currentLocale, bool isDarkMode) {
+    return ListTile(
+      leading: const Icon(
+        Icons.logout,
+        color: Colors.red,
+      ),
+      title: Text(
+        _getLocalizedText('logout', currentLocale),
+        style: const TextStyle(
+          color: Colors.red,
+        ),
+      ),
+      onTap: () async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(_getLocalizedText('logout', currentLocale)),
+            content: Text(_getLocalizedText('logoutConfirm', currentLocale)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(_getLocalizedText('cancel', currentLocale)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(
+                  _getLocalizedText('logout', currentLocale),
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true) {
+          await ref.read(authProvider.notifier).logout();
+          if (context.mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+            );
+          }
+        }
       },
     );
   }
@@ -659,6 +709,9 @@ class SettingsScreen extends ConsumerWidget {
       'remaining': {'en': 'remaining', 'zh': '次可用', 'zh_TW': '次可用'},
       'limitReached': {'en': 'Limit', 'zh': '已用完', 'zh_TW': '已用完'},
       'tokenUsage': {'en': 'Token Usage', 'zh': 'Token消耗', 'zh_TW': 'Token消耗'},
+      'logout': {'en': 'Logout', 'zh': '退出登录', 'zh_TW': '退出登入'},
+      'logoutConfirm': {'en': 'Are you sure you want to logout?', 'zh': '确定要退出登录吗？', 'zh_TW': '確定要退出登入嗎？'},
+      'cancel': {'en': 'Cancel', 'zh': '取消', 'zh_TW': '取消'},
     };
 
     final localeKey = locale.countryCode != null ? '${locale.languageCode}_${locale.countryCode}' : locale.languageCode;

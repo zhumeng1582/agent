@@ -90,15 +90,15 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
   }
 
   Future<void> _generateChatTitle(String content) async {
-    // Use AI to generate a title based on the message content
-    final aiService = ref.read(aiServiceProvider);
-    final title = await aiService.summarizeForTitle(content);
-    if (title.isNotEmpty) {
-      await ref.read(chatsProvider.notifier).updateChatName(_actualChatId, title);
-      setState(() {
-        _chatTitle = title;
-      });
+    // Use simple truncation for title (AI title generation requires backend support)
+    String title = content;
+    if (content.length > 20) {
+      title = '${content.substring(0, 20)}...';
     }
+    await ref.read(chatsProvider.notifier).updateChatName(_actualChatId, title);
+    setState(() {
+      _chatTitle = title;
+    });
   }
 
   @override
@@ -453,8 +453,9 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                         _chatTitle = newTitle;
                       });
                     },
-                    onClearChat: () async {
-                      await ref.read(messagesProvider(_actualChatId).notifier).clearAll();
+                    onDeleted: () {
+                      // Navigate back to chat list after deletion
+                      Navigator.pop(context);
                     },
                   ),
                 ),
@@ -467,8 +468,11 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
         child: Column(
           children: [
             Expanded(
-              child: messages.isEmpty
-                  ? Center(
+              child: Builder(
+                builder: (context) {
+                  final suggestedTopics = ref.watch(suggestedTopicsProvider(_actualChatId));
+                  if (messages.isEmpty) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -501,12 +505,18 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
+                    );
+                  } else {
+                    return ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      itemCount: messages.length,
+                      itemCount: messages.length + (suggestedTopics.isNotEmpty ? 1 : 0),
                       itemBuilder: (context, index) {
+                        // Show suggested topics at the end of the list
+                        if (suggestedTopics.isNotEmpty && index == messages.length) {
+                          return _buildSuggestedTopics();
+                        }
+
                         final message = messages[index];
                         final showDate = index == 0 ||
                             !_isSameDay(messages[index - 1].timestamp, message.timestamp);
@@ -523,11 +533,13 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
                           onFollowUp: (msg) => _createFollowUpChat(context, msg),
                         );
                       },
-                    ),
+                    );
+                  }
+                },
+              ),
             ),
             if (_replyToMessage != null) _buildReplyBanner(),
             _buildLoadingIndicator(isDarkMode, locale),
-            _buildSuggestedTopics(),
             InputBar(
               chatId: _actualChatId,
               isTempChat: widget.isTempChat,

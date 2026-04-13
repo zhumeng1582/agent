@@ -66,6 +66,37 @@ class Message {
     );
   }
 
+  // Parse from server response
+  factory Message.fromServerMap(Map<String, dynamic> map) {
+    return Message(
+      id: map['id'],
+      chatId: map['conversation_id'] ?? '',
+      type: MessageType.values[map['type'] ?? 0],
+      content: map['content'],
+      mediaPath: map['media_path'],
+      timestamp: map['timestamp'] != null
+          ? DateTime.parse(map['timestamp'])
+          : DateTime.now(),
+      isFromMe: map['is_from_me'] ?? true,
+      replyToId: map['reply_to_id'],
+      replyToContent: map['reply_to_content'],
+      isFavorite: map['is_favorite'] ?? false,
+      translatedContent: map['translated_content'],
+      reasoning: map['reasoning'],
+    );
+  }
+
+  // Convert to server request format
+  Map<String, dynamic> toServerMap() {
+    return {
+      'type': type.index,
+      'content': content,
+      'media_path': mediaPath,
+      'reply_to_id': replyToId,
+      'reply_to_content': replyToContent,
+    };
+  }
+
   Message copyWith({
     String? id,
     String? chatId,

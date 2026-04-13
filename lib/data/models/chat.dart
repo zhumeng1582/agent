@@ -37,6 +37,20 @@ class Chat {
     );
   }
 
+  // Parse from server response
+  factory Chat.fromServerMap(Map<String, dynamic> map) {
+    return Chat(
+      id: map['id'],
+      name: map['title'] ?? map['name'] ?? '新聊天',
+      lastMessageTime: map['last_message_time'] != null
+          ? DateTime.parse(map['last_message_time'])
+          : DateTime.now(),
+      lastMessagePreview: map['last_message_preview'],
+      unreadCount: 0,
+      isPinned: map['is_pinned'] ?? false,
+    );
+  }
+
   Chat copyWith({
     String? id,
     String? name,

@@ -22,16 +22,6 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
     _save(mode);
   }
 
-  void toggleTheme() {
-    if (state == ThemeMode.light) {
-      setTheme(ThemeMode.dark);
-    } else if (state == ThemeMode.dark) {
-      setTheme(ThemeMode.system);
-    } else {
-      setTheme(ThemeMode.light);
-    }
-  }
-
   Future<void> _save(ThemeMode mode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('theme_mode', _themeModeToString(mode));

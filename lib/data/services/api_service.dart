@@ -296,6 +296,35 @@ class ApiService {
     return get('/api/v1/auth/me');
   }
 
+  // Password endpoints
+  static Future<ApiResponse> forgotPassword({String? email, String? phone}) async {
+    return post('/api/v1/auth/password/forgot', body: {
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+    });
+  }
+
+  static Future<ApiResponse> resetPassword({String? email, String? phone, required String code, required String newPassword}) async {
+    return post('/api/v1/auth/password/reset', body: {
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+      'code': code,
+      'new_password': newPassword,
+    });
+  }
+
+  static Future<ApiResponse> changePassword(String oldPassword, String newPassword) async {
+    return post('/api/v1/auth/password/change', body: {
+      'old_password': oldPassword,
+      'new_password': newPassword,
+    });
+  }
+
+  // Usage endpoint
+  static Future<ApiResponse> getUsage() async {
+    return get('/api/v1/usage');
+  }
+
   // Conversation endpoints
   static Future<ApiResponse> getConversations() async {
     return get('/api/v1/conversations');

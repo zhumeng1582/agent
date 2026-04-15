@@ -8,6 +8,7 @@ import '../../core/constants/usage_provider.dart';
 import 'avatar_edit_screen.dart';
 import 'favorites_screen.dart';
 import 'about_screen.dart';
+import 'change_password_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -42,6 +43,7 @@ class SettingsScreen extends ConsumerWidget {
             isDarkMode: isDarkMode,
             children: [
               _buildAvatarEditTile(context, ref, currentLocale, isDarkMode),
+              _buildChangePasswordTile(context, currentLocale, isDarkMode),
               _buildFavoritesTile(context, currentLocale, isDarkMode),
             ],
           ),
@@ -169,6 +171,31 @@ class SettingsScreen extends ConsumerWidget {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const AvatarEditScreen()),
+        );
+      },
+    );
+  }
+
+  Widget _buildChangePasswordTile(BuildContext context, Locale currentLocale, bool isDarkMode) {
+    return ListTile(
+      leading: Icon(
+        Icons.lock_outline,
+        color: AppColors.primary,
+      ),
+      title: Text(
+        _getLocalizedText('changePassword', currentLocale),
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
         );
       },
     );
@@ -630,6 +657,7 @@ class SettingsScreen extends ConsumerWidget {
       'settings': {'en': 'Settings', 'zh': '设置', 'zh_TW': '設定'},
       'account': {'en': 'Account', 'zh': '账号', 'zh_TW': '帳號'},
       'editAvatar': {'en': 'Edit Avatar', 'zh': '修改头像', 'zh_TW': '修改頭像'},
+      'changePassword': {'en': 'Change Password', 'zh': '修改密码', 'zh_TW': '修改密碼'},
       'favorites': {'en': 'Favorites', 'zh': '收藏', 'zh_TW': '收藏'},
       'appearance': {'en': 'Appearance', 'zh': '外观', 'zh_TW': '外觀'},
       'darkMode': {'en': 'Dark Mode', 'zh': '深色模式', 'zh_TW': '深色模式'},

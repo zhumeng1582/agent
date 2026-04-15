@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/auth_provider.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,26 +17,33 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  int _currentTab = 0; // 0: 邮箱, 1: 手机, 2: 微信
+  int _currentTab = 0; // 0: 邮箱, 1: 手机
+  bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final locale = ref.watch(localeProvider);
-    final authState = ref.watch(authProvider);
 
     return Scaffold(
       backgroundColor: isDarkMode ? AppColors.backgroundDark : AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            const Spacer(),
-            // Logo
+            SizedBox(height: 80),
+            // AI Logo
             Container(
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -44,30 +53,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.chat_bubble_rounded,
-                color: Colors.white,
-                size: 40,
+              padding: const EdgeInsets.all(16),
+              child: SvgPicture.asset(
+                'assets/icons/ai_logo.svg',
+                width: 48,
+                height: 48,
               ),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'AI Chat',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _t('welcome', locale),
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 40),
             // Login tabs
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -79,7 +72,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   _buildTab(0, _t('email', locale), isDarkMode),
                   _buildTab(1, _t('phone', locale), isDarkMode),
-                  _buildTab(2, '微信', isDarkMode),
                 ],
               ),
             ),
@@ -90,9 +82,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: _buildTabContent(isDarkMode, locale),
             ),
             const Spacer(),
+            // WeChat login at bottom
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _buildWechatLoginButton(isDarkMode, locale),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildWechatLoginButton(bool isDarkMode, Locale locale) {
+    return Column(
+      children: [
+        const Text(
+          '—— 其他登录方式 ——',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('微信登录开发中...'), backgroundColor: Colors.orange),
+            );
+          },
+          child: SvgPicture.asset(
+            'assets/icons/wechat.svg',
+            width: 48,
+            height: 48,
+          ),
+        ),
+      ],
     );
   }
 
@@ -126,8 +151,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return _EmailLoginForm(isDarkMode: isDarkMode, locale: locale);
       case 1:
         return _PhoneLoginForm(isDarkMode: isDarkMode, locale: locale);
-      case 2:
-        return _WechatLoginForm(isDarkMode: isDarkMode);
       default:
         return const SizedBox();
     }
@@ -167,6 +190,19 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadLastLogin();
+  }
+
+  Future<void> _loadLastLogin() async {
+    final lastLogin = await ref.read(authProvider.notifier).getLastLogin();
+    if (lastLogin != null && lastLogin['method'] == 'email' && mounted) {
+      _emailController.text = lastLogin['identifier'] ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -179,6 +215,7 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
       'password': {'en': 'Password', 'zh': '密码', 'zh_TW': '密碼'},
       'login': {'en': 'Login', 'zh': '登录', 'zh_TW': '登入'},
       'register': {'en': 'Register', 'zh': '注册', 'zh_TW': '註冊'},
+      'forgotPassword': {'en': 'Forgot Password?', 'zh': '忘记密码？', 'zh_TW': '忘記密碼？'},
       'loginFailed': {'en': 'Login failed', 'zh': '登录失败', 'zh_TW': '登入失敗'},
     };
     final localeKey = widget.locale.countryCode != null
@@ -231,7 +268,7 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
         const SizedBox(height: 16),
         TextField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _obscurePassword,
           decoration: InputDecoration(
             labelText: _t('password'),
             filled: true,
@@ -239,6 +276,14 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
             ),
           ),
         ),
@@ -262,19 +307,38 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
               : Text(_t('login')),
         ),
         const SizedBox(height: 12),
-        TextButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const RegisterScreen()),
-            );
-          },
-          child: Text(
-            _t('register'),
-            style: TextStyle(
-              color: AppColors.primary,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                );
+              },
+              child: Text(
+                _t('register'),
+                style: TextStyle(
+                  color: AppColors.primary,
+                ),
+              ),
             ),
-          ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                );
+              },
+              child: Text(
+                _t('forgotPassword'),
+                style: TextStyle(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -299,6 +363,19 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
   bool _usePassword = true;
   bool _codeSent = false;
   int _countdown = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastLogin();
+  }
+
+  Future<void> _loadLastLogin() async {
+    final lastLogin = await ref.read(authProvider.notifier).getLastLogin();
+    if (lastLogin != null && lastLogin['method'] == 'phone' && mounted) {
+      _phoneController.text = lastLogin['identifier'] ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -406,7 +483,7 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
         if (_usePassword)
           TextField(
             controller: _passwordController,
-            obscureText: true,
+            obscureText: _obscurePassword,
             decoration: InputDecoration(
               labelText: _t('password'),
               filled: true,
@@ -414,6 +491,14 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
+              ),
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
               ),
             ),
           )
@@ -491,57 +576,6 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
             style: TextStyle(
               color: AppColors.primary,
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _WechatLoginForm extends ConsumerWidget {
-  final bool isDarkMode;
-
-  const _WechatLoginForm({required this.isDarkMode});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // WeChat login button placeholder
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('微信登录开发中...'), backgroundColor: Colors.orange),
-            );
-          },
-          child: Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.green,
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: const Icon(
-              Icons.chat,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          '微信登录',
-          style: TextStyle(
-            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          '更多登录方式陆续支持',
-          style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
           ),
         ),
       ],

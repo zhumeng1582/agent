@@ -5,10 +5,9 @@ import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
 import '../../core/constants/font_size_provider.dart';
 import '../../core/constants/usage_provider.dart';
-import '../../core/constants/auth_provider.dart';
 import 'avatar_edit_screen.dart';
 import 'favorites_screen.dart';
-import 'login_screen.dart';
+import 'about_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -44,7 +43,6 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               _buildAvatarEditTile(context, ref, currentLocale, isDarkMode),
               _buildFavoritesTile(context, currentLocale, isDarkMode),
-              _buildLogoutTile(context, ref, currentLocale, isDarkMode),
             ],
           ),
           _buildSection(
@@ -68,16 +66,7 @@ class SettingsScreen extends ConsumerWidget {
             title: _getLocalizedText('about', currentLocale),
             isDarkMode: isDarkMode,
             children: [
-              _buildInfoTile(
-                title: _getLocalizedText('version', currentLocale),
-                value: '1.0.0',
-                isDarkMode: isDarkMode,
-              ),
-              _buildInfoTile(
-                title: _getLocalizedText('developer', currentLocale),
-                value: 'Claude Code',
-                isDarkMode: isDarkMode,
-              ),
+              _buildAboutTile(context, currentLocale, isDarkMode),
             ],
           ),
           Padding(
@@ -210,49 +199,27 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLogoutTile(BuildContext context, WidgetRef ref, Locale currentLocale, bool isDarkMode) {
+  Widget _buildAboutTile(BuildContext context, Locale currentLocale, bool isDarkMode) {
     return ListTile(
-      leading: const Icon(
-        Icons.logout,
-        color: Colors.red,
+      leading: Icon(
+        Icons.info_outline,
+        color: AppColors.primary,
       ),
       title: Text(
-        _getLocalizedText('logout', currentLocale),
-        style: const TextStyle(
-          color: Colors.red,
+        _getLocalizedText('about', currentLocale),
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),
-      onTap: () async {
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(_getLocalizedText('logout', currentLocale)),
-            content: Text(_getLocalizedText('logoutConfirm', currentLocale)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(_getLocalizedText('cancel', currentLocale)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  _getLocalizedText('logout', currentLocale),
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+      ),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AboutScreen()),
         );
-        if (confirm == true) {
-          await ref.read(authProvider.notifier).logout();
-          if (context.mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (route) => false,
-            );
-          }
-        }
       },
     );
   }
@@ -526,27 +493,6 @@ class SettingsScreen extends ConsumerWidget {
         ref.read(themeProvider.notifier).setTheme(mode);
         Navigator.pop(context);
       },
-    );
-  }
-
-  Widget _buildInfoTile({
-    required String title,
-    required String value,
-    required bool isDarkMode,
-  }) {
-    return ListTile(
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-      trailing: Text(
-        value,
-        style: TextStyle(
-          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-        ),
-      ),
     );
   }
 

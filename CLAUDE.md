@@ -27,6 +27,19 @@
 - `loadingChatIdsProvider` tracks which chats have AI "thinking" state
 - Per-chat loading via `Set<String>` not single ID
 
+### AI Error Handling
+- `aiErrorProvider` (StateProvider<AIErrorState?>) holds current AI error
+- `AIErrorState` contains: chatId, message, userMessage (the failed message)
+- Errors display as snackbar with retry button, NOT as chat messages
+- `retryLastMessage()` in MessagesNotifier resends the failed user message
+- Error listener set up in `ChatRoomScreen.build()` via `ref.listen`
+
+### Screens
+- `ChatRoomScreen` - Main chat interface with message list and input bar
+- `ChatSettingsScreen` - Per-chat settings (title, delete)
+- `AboutScreen` - Version, developer info, logout (new separate page)
+- `SettingsScreen` - App settings, links to AboutScreen
+
 ## Important Notes
 - AI responses are一次性返回 (complete in one go), not streaming
 - Typewriter effect is simulated for better UX
@@ -36,3 +49,4 @@
 - Fix: `isStreaming` must be `bool?` not `bool` (null from old messages)
 - Fix: Timer disposal in `TextMessage` must check `mounted`
 - Fix: Message bubble width uses 100% maxWidth with 16px container padding
+- Fix: AI errors show as snackbar with retry, not as chat messages

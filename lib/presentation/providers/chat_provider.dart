@@ -548,14 +548,25 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       if (response.success && response.data != null) {
         replyContent = response.data['content'] ?? '';
         reasoning = response.data['reasoning'];
+        // Clear any previous error state when AI responds successfully
+        _ref.read(aiErrorProvider.notifier).state = null;
       } else if (response.statusCode == 404) {
         // 对话在服务端不存在，删除本地对话并提示用户
         await ChatRepository().deleteChat(effectiveChatId);
         replyContent = '该对话已在其他设备删除，已为您返回聊天列表';
         reasoning = null;
+        _ref.read(aiErrorProvider.notifier).state = null;
       } else {
-        replyContent = 'AI 服务暂时不可用，请检查网络或登录状态';
-        reasoning = null;
+        // 使用服务端返回的错误信息，通过 snackbar 显示，不插入为消息
+        final errorMsg = response.error ?? 'AI 服务暂时不可用，请检查网络或登录状态';
+        _ref.read(aiErrorProvider.notifier).state = AIErrorState(
+          chatId: effectiveChatId,
+          message: errorMsg,
+          userMessage: originalMessage.content ?? '',
+        );
+        // 从 loading 状态移除
+        _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
+        return;
       }
 
       // Estimate tokens from response length (rough approximation: 1 token ≈ 2 chars)
@@ -585,21 +596,37 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
         updateMessage(completedReply);
       });
     } catch (e) {
-      final errorReply = Message(
-        id: _uuid.v4(),
+      // 网络或其他异常，通过 snackbar 显示，不插入为消息
+      _ref.read(aiErrorProvider.notifier).state = AIErrorState(
         chatId: effectiveChatId,
-        type: MessageType.text,
-        content: 'AI回复失败: $e',
-        timestamp: DateTime.now(),
-        isFromMe: false,
+        message: 'AI 服务暂时不可用，请稍后重试',
+        userMessage: originalMessage.content ?? '',
       );
-      await _repository.saveMessage(errorReply);
-      state = [...state, errorReply];
-    } finally {
-      // 从 loading 状态移除（使用原始 _chatId，因为 loading 状态是用它添加的）
+      // 从 loading 状态移除
       _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
+    } finally {
       // Note: Don't reset consecutive count here - it should only reset when user acts on suggestions
     }
+  }
+
+  /// Retry the last failed AI request with the stored user message
+  Future<void> retryLastMessage() async {
+    final errorState = _ref.read(aiErrorProvider);
+    if (errorState == null || errorState.userMessage.isEmpty) return;
+
+    // Clear error state
+    _ref.read(aiErrorProvider.notifier).state = null;
+
+    // Create a message from the stored user content and retry
+    final userMessage = Message(
+      id: _uuid.v4(),
+      chatId: _chatId,
+      type: MessageType.text,
+      content: errorState.userMessage,
+      timestamp: DateTime.now(),
+      isFromMe: true,
+    );
+    await _addAIReply(userMessage);
   }
 
   Future<void> _addAIImageReply(Message originalMessage) async {
@@ -653,3 +680,19 @@ final isRecordingProvider = StateProvider<bool>((ref) => false);
 final recordingPathProvider = StateProvider<String?>((ref) => null);
 final isPlayingProvider = StateProvider<bool>((ref) => false);
 final playingPathProvider = StateProvider<String?>((ref) => null);
+
+/// AI error state with retry capability
+class AIErrorState {
+  final String? chatId;
+  final String message;
+  final String userMessage; // The message that failed to send
+
+  AIErrorState({
+    this.chatId,
+    required this.message,
+    required this.userMessage,
+  });
+}
+
+final aiErrorProvider = StateProvider<AIErrorState?>((ref) => null);
+

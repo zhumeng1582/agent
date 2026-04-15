@@ -51,6 +51,7 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
     _actualChatId = widget.chatId;
     _chatTitle = widget.chatName;
     _scrollController.addListener(_onScroll);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.highlightMessageId != null) {
         _scrollToMessage(widget.highlightMessageId!);
@@ -402,6 +403,27 @@ class _ChatRoomScreenState extends ConsumerState<ChatRoomScreen> {
             _scrollToBottom();
           }
         }
+      }
+    });
+
+    // Listen for AI errors and show snackbar with retry
+    ref.listen<AIErrorState?>(aiErrorProvider, (previous, next) {
+      if (next != null && next.chatId == _actualChatId) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.message),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: '重试',
+              textColor: Colors.white,
+              onPressed: () {
+                ref.read(messagesProvider(_actualChatId).notifier).retryLastMessage();
+              },
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     });
 

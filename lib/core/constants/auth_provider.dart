@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/services/api_service.dart';
+import '../../data/services/database_service.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
@@ -51,26 +53,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // Wait for ApiService to be initialized
+    // Wait for ApiService to be fully initialized (including token loading)
     while (!ApiService.isInitialized) {
       await Future.delayed(const Duration(milliseconds: 50));
     }
+    // Additional delay to ensure tokens are loaded into memory
+    await Future.delayed(const Duration(milliseconds: 100));
 
     // Check if we have stored tokens
     if (ApiService.isAuthenticated) {
+      debugPrint('[AuthNotifier] Token found, verifying with server...');
       // Verify token by fetching user info
       final response = await ApiService.getMe();
       if (response.success && response.data != null) {
+        final userId = response.data['id'] as String?;
         state = AuthState(
           status: AuthStatus.authenticated,
-          userId: response.data['id'],
+          userId: userId,
           email: response.data['email'],
           phone: response.data['phone'],
           nickname: response.data['nickname'],
           avatarUrl: response.data['avatar_url'],
         );
+        DatabaseService.setCurrentUser(userId);
+        debugPrint('[AuthNotifier] Auth restored successfully');
         return;
+      } else {
+        debugPrint('[AuthNotifier] Token invalid or expired, clearing...');
+        await ApiService.clearTokens();
       }
+    } else {
+      debugPrint('[AuthNotifier] No token found, staying logged out');
     }
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
@@ -86,14 +99,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Fetch user info
       final userResponse = await ApiService.getMe();
       if (userResponse.success && userResponse.data != null) {
+        final userId = userResponse.data['id'] as String?;
         state = AuthState(
           status: AuthStatus.authenticated,
-          userId: userResponse.data['id'],
+          userId: userId,
           email: userResponse.data['email'],
           phone: userResponse.data['phone'],
           nickname: userResponse.data['nickname'],
           avatarUrl: userResponse.data['avatar_url'],
         );
+        DatabaseService.setCurrentUser(userId);
         return true;
       }
     }
@@ -111,14 +126,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final userResponse = await ApiService.getMe();
       if (userResponse.success && userResponse.data != null) {
+        final userId = userResponse.data['id'] as String?;
         state = AuthState(
           status: AuthStatus.authenticated,
-          userId: userResponse.data['id'],
+          userId: userId,
           email: userResponse.data['email'],
           phone: userResponse.data['phone'],
           nickname: userResponse.data['nickname'],
           avatarUrl: userResponse.data['avatar_url'],
         );
+        DatabaseService.setCurrentUser(userId);
         return true;
       }
     }
@@ -141,14 +158,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final userResponse = await ApiService.getMe();
       if (userResponse.success && userResponse.data != null) {
+        final userId = userResponse.data['id'] as String?;
         state = AuthState(
           status: AuthStatus.authenticated,
-          userId: userResponse.data['id'],
+          userId: userId,
           email: userResponse.data['email'],
           phone: userResponse.data['phone'],
           nickname: userResponse.data['nickname'],
           avatarUrl: userResponse.data['avatar_url'],
         );
+        DatabaseService.setCurrentUser(userId);
         return true;
       }
     }
@@ -167,6 +186,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return false;
   }
 
+  Future<bool> registerWithEmail(String email, String password, {String? nickname}) async {
+    state = state.copyWith(error: null);
+    final response = await ApiService.register(email, password, nickname: nickname);
+    if (response.success && response.data != null) {
+      // After register, login automatically
+      return loginWithEmail(email, password);
+    }
+    state = state.copyWith(error: response.error ?? 'Registration failed');
+    return false;
+  }
+
   Future<bool> wechatLogin(String code) async {
     state = state.copyWith(error: null);
     final response = await ApiService.wechatLogin(code);
@@ -177,14 +207,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final userResponse = await ApiService.getMe();
       if (userResponse.success && userResponse.data != null) {
+        final userId = userResponse.data['id'] as String?;
         state = AuthState(
           status: AuthStatus.authenticated,
-          userId: userResponse.data['id'],
+          userId: userId,
           email: userResponse.data['email'],
           phone: userResponse.data['phone'],
           nickname: userResponse.data['nickname'],
           avatarUrl: userResponse.data['avatar_url'],
         );
+        DatabaseService.setCurrentUser(userId);
         return true;
       }
     }
@@ -195,6 +227,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await ApiService.logout();
     await ApiService.clearTokens();
+    DatabaseService.setCurrentUser(null);
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 

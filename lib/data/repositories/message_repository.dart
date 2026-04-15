@@ -3,6 +3,7 @@ import '../models/message.dart';
 import '../services/database_service.dart';
 import '../services/api_service.dart';
 import '../services/sync_queue_service.dart';
+import 'chat_repository.dart';
 
 class MessageRepository {
   final SyncQueueService _syncQueue = SyncQueueService();
@@ -13,8 +14,15 @@ class MessageRepository {
       try {
         final response = await ApiService.getMessages(chatId);
         if (response.success && response.data != null) {
-          final List<dynamic> data = response.data['data'] ?? response.data;
-          final serverMessages = data.map((map) => Message.fromServerMap(map)).toList();
+          final List<dynamic> data;
+          if (response.data is Map && response.data['data'] != null) {
+            data = response.data['data'] as List<dynamic>;
+          } else if (response.data is List) {
+            data = response.data as List<dynamic>;
+          } else {
+            data = [];
+          }
+          final serverMessages = data.map((map) => Message.fromServerMap(map as Map<String, dynamic>)).toList();
 
           if (since == null) {
             // 全量同步：清空并重建
@@ -24,6 +32,10 @@ class MessageRepository {
             // 增量同步：合并
             return await _mergeMessages(chatId, serverMessages, since);
           }
+        } else if (response.statusCode == 404) {
+          // 对话在服务端不存在，删除本地对话
+          await ChatRepository().deleteChat(chatId);
+          return [];
         }
       } catch (e) {
         debugPrint('Failed to fetch messages from server: $e');

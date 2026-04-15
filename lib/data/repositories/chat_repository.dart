@@ -14,8 +14,15 @@ class ChatRepository {
         // 使用 since 参数进行增量同步
         final response = await ApiService.getConversations();
         if (response.success && response.data != null) {
-          final List<dynamic> data = response.data['data'] ?? response.data;
-          final serverChats = data.map((map) => Chat.fromServerMap(map)).toList();
+          final List<dynamic> data;
+          if (response.data is Map && response.data['data'] != null) {
+            data = response.data['data'] as List<dynamic>;
+          } else if (response.data is List) {
+            data = response.data as List<dynamic>;
+          } else {
+            data = [];
+          }
+          final serverChats = data.map((map) => Chat.fromServerMap(map as Map<String, dynamic>)).toList();
 
           if (since == null) {
             // 全量同步：更新本地数据库

@@ -24,14 +24,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Wait for API service to load tokens from storage
-    // The configure() is called in main() and is async
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Trigger AuthNotifier initialization (it's lazy, created on first read)
+    // This starts _checkAuthStatus() but we don't await it here
+    ref.read(authProvider);
 
-    if (!mounted) return;
-
-    // Small delay to let auth state initialize
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Wait for auth state to be determined (not unknown), with timeout
+    final startTime = DateTime.now();
+    await Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return false;
+      // Timeout after 10 seconds to prevent infinite waiting
+      if (DateTime.now().difference(startTime).inSeconds > 10) {
+        print('SplashScreen: auth check timeout');
+        return false;
+      }
+      final authState = ref.read(authProvider);
+      return authState.status == AuthStatus.unknown;
+    });
 
     if (!mounted) return;
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/constants/usage_provider.dart';
@@ -8,6 +9,7 @@ import '../../data/models/message.dart';
 import '../../data/repositories/chat_repository.dart';
 import '../../data/repositories/message_repository.dart';
 import '../../data/services/audio_service.dart';
+import '../../data/services/database_service.dart';
 import '../../data/services/image_service.dart';
 import '../../data/services/api_service.dart';
 
@@ -107,6 +109,28 @@ class ChatsNotifier extends StateNotifier<List<Chat>> {
   Future<void> deleteChat(String chatId) async {
     await _repository.deleteChat(chatId);
     state = state.where((c) => c.id != chatId).toList();
+  }
+
+  /// 将临时对话的本地 ID 更新为服务端返回的真实 ID，同时迁移消息
+  Future<void> updateChatId(String oldId, String newId) async {
+    final chatIndex = state.indexWhere((c) => c.id == oldId);
+    if (chatIndex == -1) return;
+
+    final oldChat = state[chatIndex];
+    final updatedChat = oldChat.copyWith(id: newId);
+
+    // 迁移消息到新的 chatId
+    await DatabaseService.migrateMessagesChatId(oldId, newId);
+
+    // 从本地数据库删除旧的聊天记录，插入新的
+    await _repository.deleteChat(oldId);
+    await _repository.saveChat(updatedChat);
+
+    // 更新状态
+    state = [
+      updatedChat,
+      ...state.where((c) => c.id != oldId),
+    ];
   }
 
   Future<void> togglePinChat(String chatId) async {
@@ -430,6 +454,30 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
 
     await ensureInitialized();
 
+    // 检查是否是临时对话（本地创建的，服务端还没有）
+    bool isTempChat = _chatId.startsWith('temp_');
+    // 追踪最终使用的 chatId（可能在创建对话后更新为服务端 ID）
+    String effectiveChatId = _chatId;
+
+    // 如果是临时对话，先在服务端创建对话，避免 404
+    if (isTempChat) {
+      debugPrint('[_addAIReply] Temp chat $_chatId, creating on server first');
+      try {
+        final createResult = await ApiService.createConversation(title: '新聊天');
+        if (createResult.success && createResult.data != null) {
+          final serverChatId = createResult.data['id'] as String?;
+          if (serverChatId != null) {
+            await _ref.read(chatsProvider.notifier).updateChatId(_chatId, serverChatId);
+            effectiveChatId = serverChatId;
+            debugPrint('[_addAIReply] Created conversation $serverChatId, migrating messages');
+          }
+        }
+      } catch (e) {
+        debugPrint('[_addAIReply] Failed to create temp chat on server: $e');
+        // 继续尝试发送，服务端可能会自动创建
+      }
+    }
+
     try {
       // Build conversation history from current state (messages)
       final messages = <Map<String, String>>[];
@@ -493,12 +541,18 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       String? reasoning;
 
       // 所有 AI 请求都通过后端 API
-      final response = await ApiService.chatInConversation(_chatId, {
+      final response = await ApiService.chatInConversation(effectiveChatId, {
         'messages': messages,
       });
+
       if (response.success && response.data != null) {
         replyContent = response.data['content'] ?? '';
         reasoning = response.data['reasoning'];
+      } else if (response.statusCode == 404) {
+        // 对话在服务端不存在，删除本地对话并提示用户
+        await ChatRepository().deleteChat(effectiveChatId);
+        replyContent = '该对话已在其他设备删除，已为您返回聊天列表';
+        reasoning = null;
       } else {
         replyContent = 'AI 服务暂时不可用，请检查网络或登录状态';
         reasoning = null;
@@ -510,7 +564,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
 
       final reply = Message(
         id: _uuid.v4(),
-        chatId: _chatId,
+        chatId: effectiveChatId,
         type: MessageType.text,
         content: replyContent,
         timestamp: DateTime.now(),
@@ -521,7 +575,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
 
       await _repository.saveMessage(reply);
       state = [...state, reply];
-      _ref.read(chatsProvider.notifier).updateChatPreview(_chatId, replyContent);
+      _ref.read(chatsProvider.notifier).updateChatPreview(effectiveChatId, replyContent);
 
       // Mark streaming as complete after animation finishes (30ms per char + 500ms buffer)
       final animationDuration = Duration(milliseconds: replyContent.length * 30 + 500);
@@ -533,7 +587,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
     } catch (e) {
       final errorReply = Message(
         id: _uuid.v4(),
-        chatId: _chatId,
+        chatId: effectiveChatId,
         type: MessageType.text,
         content: 'AI回复失败: $e',
         timestamp: DateTime.now(),
@@ -542,6 +596,7 @@ class MessagesNotifier extends StateNotifier<List<Message>> {
       await _repository.saveMessage(errorReply);
       state = [...state, errorReply];
     } finally {
+      // 从 loading 状态移除（使用原始 _chatId，因为 loading 状态是用它添加的）
       _ref.read(loadingChatIdsProvider.notifier).state = _ref.read(loadingChatIdsProvider).where((id) => id != _chatId).toSet();
       // Note: Don't reset consecutive count here - it should only reset when user acts on suggestions
     }

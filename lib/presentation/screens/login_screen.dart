@@ -4,6 +4,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/auth_provider.dart';
 import '../../core/constants/theme_provider.dart';
 import '../../core/constants/locale_provider.dart';
+import 'register_screen.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -65,7 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 16),
             // Login tabs
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -83,13 +85,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 24),
             // Tab content
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: _buildTabContent(isDarkMode, locale),
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _buildTabContent(isDarkMode, locale),
             ),
+            const Spacer(),
           ],
         ),
       ),
@@ -140,6 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       'phone': {'en': 'Phone', 'zh': '手机', 'zh_TW': '手機'},
       'login': {'en': 'Login', 'zh': '登录', 'zh_TW': '登入'},
       'register': {'en': 'Register', 'zh': '注册', 'zh_TW': '註冊'},
+      'loginFailed': {'en': 'Login failed', 'zh': '登录失败', 'zh_TW': '登入失敗'},
       'password': {'en': 'Password', 'zh': '密码', 'zh_TW': '密碼'},
       'sendCode': {'en': 'Send Code', 'zh': '发送验证码', 'zh_TW': '發送驗證碼'},
       'loginWithWechat': {'en': 'Login with WeChat', 'zh': '微信登录', 'zh_TW': '微信登入'},
@@ -178,6 +179,7 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
       'password': {'en': 'Password', 'zh': '密码', 'zh_TW': '密碼'},
       'login': {'en': 'Login', 'zh': '登录', 'zh_TW': '登入'},
       'register': {'en': 'Register', 'zh': '注册', 'zh_TW': '註冊'},
+      'loginFailed': {'en': 'Login failed', 'zh': '登录失败', 'zh_TW': '登入失敗'},
     };
     final localeKey = widget.locale.countryCode != null
         ? '${widget.locale.languageCode}_${widget.locale.countryCode}'
@@ -192,10 +194,16 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
           _passwordController.text,
         );
     setState(() => _isLoading = false);
-    if (!success && mounted) {
+    if (success && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } else if (mounted) {
+      final error = ref.read(authProvider).error ?? _t('loginFailed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ref.read(authProvider).error ?? 'Login failed'),
+          content: Text(error),
           backgroundColor: Colors.red,
         ),
       );
@@ -252,6 +260,21 @@ class _EmailLoginFormState extends ConsumerState<_EmailLoginForm> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : Text(_t('login')),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+            );
+          },
+          child: Text(
+            _t('register'),
+            style: TextStyle(
+              color: AppColors.primary,
+            ),
+          ),
         ),
       ],
     );
@@ -345,10 +368,16 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
           );
     }
     setState(() => _isLoading = false);
-    if (!success && mounted) {
+    if (success && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } else if (mounted) {
+      final error = ref.read(authProvider).error ?? _t('loginFailed');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ref.read(authProvider).error ?? 'Login failed'),
+          content: Text(error),
           backgroundColor: Colors.red,
         ),
       );
@@ -448,6 +477,21 @@ class _PhoneLoginFormState extends ConsumerState<_PhoneLoginForm> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
               : Text(_t('login')),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+            );
+          },
+          child: Text(
+            _t('register'),
+            style: TextStyle(
+              color: AppColors.primary,
+            ),
+          ),
         ),
       ],
     );

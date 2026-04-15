@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +10,8 @@ class ApiService {
   static SharedPreferences? _prefs;
   static bool _isInitialized = false;
 
+  static late Dio _dio;
+
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
 
@@ -18,6 +20,46 @@ class ApiService {
     _prefs = await SharedPreferences.getInstance();
     await _loadTokens();
     _isInitialized = true;
+
+    _dio = Dio(BaseOptions(
+      baseUrl: _baseUrl!,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: {'Content-Type': 'application/json'},
+    ));
+
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        debugPrint('[ApiService] >>> ${options.method} ${options.uri}');
+        if (options.data != null) {
+          debugPrint('[ApiService] >>> Body: ${options.data is FormData ? 'FormData' : jsonEncode(options.data)}');
+        }
+        // Add auth header
+        if (_accessToken != null) {
+          options.headers['Authorization'] = 'Bearer $_accessToken';
+        }
+        handler.next(options);
+      },
+      onResponse: (response, handler) {
+        debugPrint('[ApiService] <<< ${response.statusCode} ${response.requestOptions.uri}');
+        final dataStr = response.data is String ? response.data as String : jsonEncode(response.data);
+        debugPrint('[ApiService] <<< Response: ${dataStr.length > 500 ? '${dataStr.substring(0, 500)}...' : dataStr}');
+        handler.next(response);
+      },
+      onError: (error, handler) {
+        debugPrint('[ApiService] <<< ERROR: ${error.message ?? error.type.name}');
+        debugPrint('[ApiService] <<< Response: ${error.response?.data ?? 'no response'}');
+        handler.next(error);
+      },
+    ));
+
+    // Add log interceptor
+    _dio.interceptors.add(LogInterceptor(
+      requestBody: true,
+      responseBody: true,
+      error: true,
+      logPrint: (obj) => debugPrint('[ApiService] $obj'),
+    ));
   }
 
   static bool get isInitialized => _isInitialized;
@@ -65,96 +107,43 @@ class ApiService {
   static String? get accessToken => _accessToken;
   static String? get refreshToken => _refreshToken;
 
-  static Future<Map<String, String>> get _headers async {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-    };
-    if (_accessToken != null) {
-      headers['Authorization'] = 'Bearer $_accessToken';
-    }
-    return headers;
-  }
-
-  static Future<ApiResponse> _request(
-    String method,
-    String endpoint, {
-    Map<String, dynamic>? body,
-    int timeoutSeconds = 30,
-  }) async {
-    try {
-      final headers = await _headers;
-      final uri = Uri.parse('$_baseUrl$endpoint');
-
-      http.Response response;
-      switch (method) {
-        case 'GET':
-          response = await http.get(uri, headers: headers).timeout(Duration(seconds: timeoutSeconds));
-          break;
-        case 'POST':
-          response = await http.post(uri, headers: headers, body: body != null ? jsonEncode(body) : null).timeout(Duration(seconds: timeoutSeconds));
-          break;
-        case 'PATCH':
-          response = await http.patch(uri, headers: headers, body: body != null ? jsonEncode(body) : null).timeout(Duration(seconds: timeoutSeconds));
-          break;
-        case 'DELETE':
-          response = await http.delete(uri, headers: headers).timeout(Duration(seconds: timeoutSeconds));
-          break;
-        default:
-          return ApiResponse(success: false, error: 'Unknown method');
-      }
-      return _handleResponse(response);
-    } catch (e) {
-      return ApiResponse(success: false, error: e.toString());
-    }
-  }
-
-  static Future<ApiResponse> _handleResponse(http.Response response) async {
-    // If 401, try to refresh token
-    if (response.statusCode == 401 && _refreshToken != null) {
+  static Future<ApiResponse> _handleDioError(DioException error) async {
+    if (error.response?.statusCode == 401 && _refreshToken != null) {
       debugPrint('[ApiService] Got 401, trying to refresh token...');
       final refreshed = await _refreshTokenIfNeeded();
       if (refreshed) {
-        // Retry the request (caller should retry)
         return ApiResponse(success: false, error: 'Token refreshed, please retry', statusCode: 401);
       } else {
-        // Refresh failed, clear tokens
         await clearTokens();
         return ApiResponse(success: false, error: 'Session expired', statusCode: 401);
       }
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return ApiResponse(success: true, data: {});
-      }
+    String errorMsg = 'Request failed';
+    if (error.response?.data != null) {
       try {
-        final data = jsonDecode(response.body);
-        return ApiResponse(success: true, data: data);
-      } catch (e) {
-        return ApiResponse(success: true, data: {'raw': response.body});
-      }
-    } else {
-      String error = 'Request failed';
-      try {
-        final data = jsonDecode(response.body);
-        error = data['detail'] ?? error;
+        if (error.response?.data is String) {
+          final data = jsonDecode(error.response!.data);
+          errorMsg = data['detail'] ?? errorMsg;
+        } else {
+          errorMsg = error.response?.data['detail'] ?? errorMsg;
+        }
       } catch (_) {}
-      return ApiResponse(success: false, error: error, statusCode: response.statusCode);
     }
+    return ApiResponse(success: false, error: errorMsg, statusCode: error.response?.statusCode);
   }
 
   static Future<bool> _refreshTokenIfNeeded() async {
     if (_refreshToken == null || _baseUrl == null) return false;
 
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/v1/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': _refreshToken}),
+      final response = await Dio().post(
+        '$_baseUrl/api/v1/auth/refresh',
+        data: {'refresh_token': _refreshToken},
       ).timeout(const Duration(seconds: 30));
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final data = response.data;
         final newAccessToken = data['access_token'] as String?;
         final newRefreshToken = data['refresh_token'] as String?;
 
@@ -171,19 +160,51 @@ class ApiService {
   }
 
   static Future<ApiResponse> get(String endpoint) async {
-    return _request('GET', endpoint);
+    try {
+      final response = await _dio.get(endpoint);
+      return ApiResponse(success: true, data: response.data);
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
   }
 
   static Future<ApiResponse> post(String endpoint, {Map<String, dynamic>? body, int timeoutSeconds = 30}) async {
-    return _request('POST', endpoint, body: body, timeoutSeconds: timeoutSeconds);
+    try {
+      final response = await _dio.post(
+        endpoint,
+        data: body,
+        options: Options(responseType: timeoutSeconds == 60 ? ResponseType.bytes : ResponseType.json),
+      );
+      return ApiResponse(success: true, data: response.data);
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
   }
 
   static Future<ApiResponse> patch(String endpoint, {Map<String, dynamic>? body}) async {
-    return _request('PATCH', endpoint, body: body);
+    try {
+      final response = await _dio.patch(endpoint, data: body);
+      return ApiResponse(success: true, data: response.data);
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
   }
 
   static Future<ApiResponse> delete(String endpoint) async {
-    return _request('DELETE', endpoint);
+    try {
+      final response = await _dio.delete(endpoint);
+      return ApiResponse(success: true, data: response.data);
+    } on DioException catch (e) {
+      return _handleDioError(e);
+    } catch (e) {
+      return ApiResponse(success: false, error: e.toString());
+    }
   }
 
   // Auth endpoints
@@ -197,21 +218,22 @@ class ApiService {
 
   static Future<ApiResponse> login(String email, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/v1/auth/login'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
+      final response = await Dio().post(
+        '$_baseUrl/api/v1/auth/login',
+        data: FormData.fromMap({
           'username': email,
           'password': password,
-        },
+        }),
+        options: Options(headers: {'Content-Type': 'application/x-www-form-urlencoded'}),
       ).timeout(const Duration(seconds: 30));
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        return ApiResponse(success: true, data: data);
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: response.data);
       } else {
         return ApiResponse(success: false, error: 'Login failed', statusCode: response.statusCode);
       }
+    } on DioException catch (e) {
+      return _handleDioError(e);
     } catch (e) {
       return ApiResponse(success: false, error: e.toString());
     }
@@ -335,27 +357,26 @@ class ApiService {
   // AI TTS (returns bytes)
   static Future<ApiResponse> textToSpeech(String text, {String? voiceId}) async {
     try {
-      final headers = await _headers;
-      final uri = Uri.parse('$_baseUrl/api/v1/ai/tts');
-      final response = await http.post(
-        uri,
-        headers: {...headers, 'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await _dio.post(
+        '/api/v1/ai/tts',
+        data: {
           'text': text,
           if (voiceId != null) 'voice_id': voiceId,
-        }),
+        },
+        options: Options(responseType: ResponseType.bytes),
       ).timeout(const Duration(seconds: 60));
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return ApiResponse(success: true, data: {'bytes': response.bodyBytes});
+      if (response.statusCode == 200) {
+        return ApiResponse(success: true, data: {'bytes': response.data});
       } else {
         String error = 'TTS failed';
         try {
-          final data = jsonDecode(response.body);
-          error = data['detail'] ?? error;
+          error = response.data['detail'] ?? error;
         } catch (_) {}
         return ApiResponse(success: false, error: error, statusCode: response.statusCode);
       }
+    } on DioException catch (e) {
+      return _handleDioError(e);
     } catch (e) {
       return ApiResponse(success: false, error: e.toString());
     }
